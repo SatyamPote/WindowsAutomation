@@ -1,0 +1,92 @@
+[project]
+name = "windows-mcp"
+version = "0.7.4"
+description = "DeskPilot – AI Windows Remote Control via Telegram. Lightweight MCP Server for Windows OS."
+authors = [
+    { name = "Satyam Pote" }
+]
+readme = "README.md"
+license = { file = "LICENSE.md" }
+keywords = ["deskpilot", "windows", "mcp", "ai", "desktop", "ai agent", "telegram", "remote control"]
+requires-python = ">=3.13"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Desktop Environment",
+    "Topic :: System :: Shells",
+]
+dependencies = [
+    "click>=8.2.1",
+    "comtypes>=1.4.15",
+    "dxcam>=0.3.0",
+    "fastmcp>=3.0",
+    "fuzzywuzzy>=0.18.0",
+    "markdownify>=1.1.0",
+    "pillow>=11.2.1",
+    "platformdirs>=4.3.8",
+    "posthog>=7.4.0",
+    "psutil>=7.0.0",
+    "pygments>=2.20.0",
+    "python-dotenv>=1.0.0",
+    "python-levenshtein>=0.27.1",
+    "openai>=1.0.0",
+    "google-genai>=0.5.0",
+    "python-telegram-bot>=21.0",
+    "pywin32>=311",
+    "requests>=2.32.3",
+    "tabulate>=0.9.0",
+    "thefuzz>=0.22.1",
+    "uuid7>=0.1.0",
+    "python-docx>=1.1.0",
+    "openpyxl>=3.1.2",
+    "reportlab>=4.1.0",
+    "pytesseract>=0.3.10",
+    "playwright>=1.42.0",
+    "cryptography>=42.0.0",
+    "ollama>=0.4.0",
+    "yt-dlp>=2024.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/SatyamPote"
+Repository = "https://github.com/SatyamPote/DeskPilot"
+Issues = "https://github.com/SatyamPote/DeskPilot/issues"
+
+[project.scripts]
+windows-mcp = "windows_mcp.__main__:main"
+deskpilot-bot = "windows_mcp.telegram_bot:run_bot"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/windows_mcp/uia/*.py" = ["F403", "F405"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.uv.extra-build-dependencies]
+pyperclip = ["setuptools"]

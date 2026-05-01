@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.SatyamPote/DeskPilot",
+  "description": "DeskPilot – AI Windows Remote Control via Telegram",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/SatyamPote/DeskPilot",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registry_type": "pypi",
+      "registry_base_url": "https://pypi.org",
+      "identifier": "windows-mcp",
+      "version": "0.6.2",
+      "runtime_hint": "uvx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
