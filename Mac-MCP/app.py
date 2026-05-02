@@ -1,10 +1,17 @@
 """
 Lotus — macOS Control Panel
 ============================
-CustomTkinter GUI for starting/stopping the Telegram bot
-and entering configuration. Bot runs as an independent
-background process (bot_service.py). Closing this window
-hides the app — the bot keeps running.
+CustomTkinter GUI for configuring and running the Lotus Telegram bot.
+The bot runs as an independent background process (bot_service.py).
+Closing this window hides the app to the macOS menu bar — the bot keeps running.
+
+Features:
+  • First-time setup wizard (token, user IDs, name, Ollama model)
+  • Ollama model auto-detection from local server
+  • Start / stop / status of the background bot service
+  • Start-on-login via launchd
+  • Live log viewer
+  • macOS menu bar icon for quick access
 """
 
 import json
@@ -21,7 +28,7 @@ from PIL import Image
 
 # ── Paths ──────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
-SRC_DIR = BASE_DIR / "src"
+SRC_DIR  = BASE_DIR / "src"
 if SRC_DIR.exists() and str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
@@ -29,10 +36,10 @@ APP_DATA_DIR = Path.home() / "Library" / "Application Support" / "Lotus"
 APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 (APP_DATA_DIR / "logs").mkdir(exist_ok=True)
 
-CONFIG_FILE = BASE_DIR / "config.json"
-PID_FILE = APP_DATA_DIR / "lotus_bot.pid"
-LOG_FILE = APP_DATA_DIR / "logs" / "lotus_app.log"
-BOT_LOG_FILE = APP_DATA_DIR / "logs" / "bot_service.log"
+CONFIG_FILE   = BASE_DIR / "config.json"
+PID_FILE      = APP_DATA_DIR / "lotus_bot.pid"
+LOG_FILE      = APP_DATA_DIR / "logs" / "lotus_app.log"
+BOT_LOG_FILE  = APP_DATA_DIR / "logs" / "bot_service.log"
 LAUNCHD_PLIST = Path.home() / "Library" / "LaunchAgents" / "com.lotus.botservice.plist"
 
 # ── Logging ────────────────────────────────────────────────────────────────
@@ -48,12 +55,14 @@ _log = logging.getLogger("lotus_app")
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
-ACCENT        = "#ffffff"
-ACCENT_HOVER  = "#e0e0e0"
-TEXT_PRIMARY  = "#ffffff"
+ACCENT         = "#ffffff"
+ACCENT_HOVER   = "#e0e0e0"
+TEXT_PRIMARY   = "#ffffff"
 TEXT_SECONDARY = "#888888"
-BORDER        = "#333333"
-APP_NAME      = "Lotus"
+BORDER         = "#333333"
+GREEN          = "#4caf50"
+RED            = "#f44336"
+APP_NAME       = "Lotus"
 
 
 # ── Asset helpers ──────────────────────────────────────────────────────────
@@ -109,6 +118,28 @@ def load_config() -> dict | None:
 
 def save_config(data: dict) -> None:
     CONFIG_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+# ── Ollama helpers ─────────────────────────────────────────────────────────
+
+def fetch_ollama_models() -> list[str]:
+    """Return models available on the local Ollama server, or [] on failure."""
+    try:
+        import requests as _req
+        r = _req.get("http://localhost:11434/api/tags", timeout=3)
+        if r.status_code == 200:
+            return [m["name"] for m in r.json().get("models", [])]
+    except Exception:
+        pass
+    return []
+
+
+def ollama_is_running() -> bool:
+    try:
+        import requests as _req
+        return _req.get("http://localhost:11434/api/tags", timeout=2).status_code == 200
+    except Exception:
+        return False
 
 
 # ── macOS Login Item helpers ────────────────────────────────────────────────
@@ -193,7 +224,6 @@ def _start_bot_service() -> None:
 def _stop_bot_service() -> None:
     pid = _get_bot_pid()
     if pid is None:
-        _log.info("No PID file — bot not running")
         return
     try:
         proc = psutil.Process(pid)
@@ -208,6 +238,137 @@ def _stop_bot_service() -> None:
     PID_FILE.unlink(missing_ok=True)
 
 
+# ── macOS Menu Bar Icon ─────────────────────────────────────────────────────
+
+_menubar_thread: threading.Thread | None = None
+
+
+def _start_menubar_icon(app_ref: "LotusApp") -> None:
+    """Install a macOS menu bar status item using PyObjC."""
+    try:
+        import AppKit
+
+        class _MenuBarDelegate(AppKit.NSObject):
+            def show_(self, sender):
+                app_ref.after(0, app_ref.show_window)
+
+            def toggleBot_(self, sender):
+                if _is_bot_alive():
+                    app_ref.after(0, app_ref.stop_bot)
+                else:
+                    app_ref.after(0, app_ref.start_bot)
+
+            def quit_(self, sender):
+                app_ref.after(0, app_ref.quit_app)
+
+        status_bar = AppKit.NSStatusBar.systemStatusBar()
+        status_item = status_bar.statusItemWithLength_(AppKit.NSVariableStatusItemLength)
+        status_item.setTitle_("🌸")
+        status_item.setHighlightMode_(True)
+
+        menu = AppKit.NSMenu.alloc().init()
+        delegate = _MenuBarDelegate.alloc().init()
+
+        show_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Show Lotus", "show:", ""
+        )
+        show_item.setTarget_(delegate)
+
+        toggle_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Toggle Bot", "toggleBot:", ""
+        )
+        toggle_item.setTarget_(delegate)
+
+        sep = AppKit.NSMenuItem.separatorItem()
+
+        quit_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+            "Quit", "quit:", ""
+        )
+        quit_item.setTarget_(delegate)
+
+        menu.addItem_(show_item)
+        menu.addItem_(toggle_item)
+        menu.addItem_(sep)
+        menu.addItem_(quit_item)
+
+        status_item.setMenu_(menu)
+
+        # Keep strong references so they aren't GC'd
+        app_ref._menubar_status_item = status_item
+        app_ref._menubar_delegate = delegate
+
+    except Exception as e:
+        _log.debug("Menu bar icon unavailable: %s", e)
+
+
+# ── Model picker widget ─────────────────────────────────────────────────────
+
+class OllamaModelPicker(ctk.CTkFrame):
+    """Entry + refresh button that auto-populates a dropdown from Ollama."""
+
+    def __init__(self, master, default_model: str = "phi3", **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+
+        self._models: list[str] = []
+        self._var = ctk.StringVar(value=default_model)
+
+        self._dropdown = ctk.CTkOptionMenu(
+            self,
+            variable=self._var,
+            values=[default_model],
+            fg_color="#1a1a1a",
+            button_color=BORDER,
+            button_hover_color="#444444",
+            dropdown_fg_color="#1a1a1a",
+            text_color=TEXT_PRIMARY,
+            font=("Menlo", 12),
+        )
+        self._dropdown.pack(side="left", fill="x", expand=True)
+
+        self._refresh_btn = ctk.CTkButton(
+            self, text="⟳", width=36, height=40,
+            fg_color="transparent", hover_color=BORDER,
+            border_width=1, border_color=BORDER,
+            text_color=TEXT_SECONDARY, font=("SF Pro Text", 16),
+            command=self._refresh,
+        )
+        self._refresh_btn.pack(side="left", padx=(6, 0))
+
+        self._ollama_label = ctk.CTkLabel(
+            self, text="", font=("SF Pro Text", 11), text_color=TEXT_SECONDARY
+        )
+        self._ollama_label.pack(side="left", padx=(8, 0))
+
+        self._refresh(silent=True)
+
+    def _refresh(self, silent: bool = False) -> None:
+        self._ollama_label.configure(text="…")
+        threading.Thread(target=self._fetch, args=(silent,), daemon=True).start()
+
+    def _fetch(self, silent: bool) -> None:
+        models = fetch_ollama_models()
+        self.after(0, lambda: self._apply(models, silent))
+
+    def _apply(self, models: list[str], silent: bool) -> None:
+        if models:
+            self._models = models
+            current = self._var.get()
+            self._dropdown.configure(values=models)
+            if current not in models:
+                self._var.set(models[0])
+            self._ollama_label.configure(text=f"✅ {len(models)} model{'s' if len(models) != 1 else ''}")
+        else:
+            self._ollama_label.configure(
+                text="⚠ Ollama not found" if not silent else "⚠ Ollama offline"
+            )
+
+    def get(self) -> str:
+        return self._var.get()
+
+    def set(self, value: str) -> None:
+        self._var.set(value)
+
+
 # ── Main App ───────────────────────────────────────────────────────────────
 
 class LotusApp(ctk.CTk):
@@ -216,7 +377,7 @@ class LotusApp(ctk.CTk):
         _log.info("=== Lotus app started ===")
 
         self.title("Lotus")
-        self.geometry("400x620")
+        self.geometry("420x660")
         self.resizable(False, False)
         self.configure(fg_color="#1a1a1a")
 
@@ -231,9 +392,12 @@ class LotusApp(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.config_data = load_config()
-        self._status_poll = None
-        self._log_poll = None
+        self._status_poll: str | None = None
+        self._log_poll: str | None = None
         self._last_log_size = 0
+
+        # Start menu bar icon in background thread
+        threading.Thread(target=_start_menubar_icon, args=(self,), daemon=True).start()
 
         if self.config_data:
             self.show_control_panel()
@@ -254,7 +418,8 @@ class LotusApp(ctk.CTk):
 
         frame = ctk.CTkScrollableFrame(
             outer, fg_color="transparent", corner_radius=0,
-            scrollbar_button_color=BORDER, scrollbar_button_hover_color=TEXT_SECONDARY,
+            scrollbar_button_color=BORDER,
+            scrollbar_button_hover_color=TEXT_SECONDARY,
         )
         frame.pack(fill="both", expand=True, padx=40, pady=20)
 
@@ -264,38 +429,38 @@ class LotusApp(ctk.CTk):
         else:
             ctk.CTkLabel(frame, text="🌸", font=("SF Pro Display", 44)).pack(pady=(10, 2))
 
-        ctk.CTkLabel(frame, text=APP_NAME, font=("SF Pro Display", 32, "bold"),
+        ctk.CTkLabel(frame, text=APP_NAME,
+                     font=("SF Pro Display", 32, "bold"),
                      text_color=TEXT_PRIMARY).pack(pady=(0, 2))
-        ctk.CTkLabel(frame, text="macOS Control Agent",
-                     font=("SF Pro Text", 13), text_color="#aaaaaa").pack(pady=(0, 16))
+        ctk.CTkLabel(frame, text="macOS Remote Control Agent",
+                     font=("SF Pro Text", 13),
+                     text_color="#aaaaaa").pack(pady=(0, 16))
 
         ctk.CTkFrame(frame, height=1, fg_color=BORDER).pack(fill="x", pady=6)
-        ctk.CTkLabel(frame, text="First-Time Setup",
-                     font=("SF Pro Display", 16, "bold"), text_color=ACCENT).pack(pady=(8, 14))
+        ctk.CTkLabel(frame, text="Setup",
+                     font=("SF Pro Display", 16, "bold"),
+                     text_color=ACCENT).pack(pady=(8, 14))
 
-        # Bot Token
-        ctk.CTkLabel(frame, text="Telegram Bot Token", font=("SF Pro Text", 13),
-                     text_color=TEXT_SECONDARY, anchor="w").pack(fill="x")
+        # ── Bot Token ──
+        self._label(frame, "Telegram Bot Token")
         self.token_entry = ctk.CTkEntry(
             frame, height=40, font=("Menlo", 12),
-            placeholder_text="e.g. 123456:ABC-DEF…",
+            placeholder_text="123456:ABC-DEF…",
             fg_color="transparent", border_color=BORDER, text_color=TEXT_PRIMARY,
         )
         self.token_entry.pack(fill="x", pady=(4, 12))
 
-        # Allowed User IDs
-        ctk.CTkLabel(frame, text="Allowed Telegram User IDs (comma-separated)",
-                     font=("SF Pro Text", 13), text_color=TEXT_SECONDARY, anchor="w").pack(fill="x")
+        # ── Allowed User IDs ──
+        self._label(frame, "Allowed Telegram User IDs  (comma-separated)")
         self.ids_entry = ctk.CTkEntry(
             frame, height=40, font=("Menlo", 12),
-            placeholder_text="e.g. 123456789,987654321",
+            placeholder_text="123456789, 987654321",
             fg_color="transparent", border_color=BORDER, text_color=TEXT_PRIMARY,
         )
         self.ids_entry.pack(fill="x", pady=(4, 12))
 
-        # Your Name
-        ctk.CTkLabel(frame, text="Your Name", font=("SF Pro Text", 13),
-                     text_color=TEXT_SECONDARY, anchor="w").pack(fill="x")
+        # ── Your Name ──
+        self._label(frame, "Your Name")
         self.name_entry = ctk.CTkEntry(
             frame, height=40, font=("SF Pro Text", 13),
             placeholder_text="e.g. Jayash",
@@ -303,32 +468,40 @@ class LotusApp(ctk.CTk):
         )
         self.name_entry.pack(fill="x", pady=(4, 12))
 
-        # Ollama Model
-        ctk.CTkLabel(frame, text="Ollama Model (for AI chat fallback)",
-                     font=("SF Pro Text", 13), text_color=TEXT_SECONDARY, anchor="w").pack(fill="x")
-        self.model_entry = ctk.CTkEntry(
-            frame, height=40, font=("Menlo", 12),
-            placeholder_text="e.g. phi3  (must be pulled: ollama pull phi3)",
-            fg_color="transparent", border_color=BORDER, text_color=TEXT_PRIMARY,
-        )
-        self.model_entry.pack(fill="x", pady=(4, 16))
+        # ── Ollama Model ──
+        self._label(frame, "Ollama Model  (AI chat fallback — must be pulled locally)")
+        self.model_picker = OllamaModelPicker(frame, default_model="phi3")
+        self.model_picker.pack(fill="x", pady=(4, 4))
 
-        self.setup_error = ctk.CTkLabel(frame, text="", font=("SF Pro Text", 12),
-                                        text_color="#ff6b6b")
+        ctk.CTkLabel(
+            frame,
+            text="Install Ollama: brew install ollama  →  ollama pull phi3",
+            font=("SF Pro Text", 10), text_color="#555555",
+        ).pack(fill="x", pady=(0, 12))
+
+        self.setup_error = ctk.CTkLabel(
+            frame, text="", font=("SF Pro Text", 12), text_color=RED
+        )
         self.setup_error.pack()
 
         ctk.CTkButton(
-            frame, text="💾  Save & Continue", height=50,
+            frame, text="💾  Save & Launch Bot", height=50,
             font=("SF Pro Display", 16, "bold"), corner_radius=10,
             fg_color=ACCENT, hover_color=ACCENT_HOVER,
             text_color="#0d1117", command=self.save_setup,
         ).pack(fill="x", pady=(8, 20))
 
+    def _label(self, parent, text: str) -> None:
+        ctk.CTkLabel(
+            parent, text=text,
+            font=("SF Pro Text", 13), text_color=TEXT_SECONDARY, anchor="w",
+        ).pack(fill="x")
+
     def save_setup(self):
-        token = self.token_entry.get().strip()
+        token    = self.token_entry.get().strip()
         user_ids = self.ids_entry.get().strip()
-        name = self.name_entry.get().strip()
-        model = self.model_entry.get().strip() or "phi3"
+        name     = self.name_entry.get().strip()
+        model    = self.model_picker.get().strip() or "phi3"
 
         if not token:
             self.setup_error.configure(text="⚠ Bot Token is required.")
@@ -348,18 +521,20 @@ class LotusApp(ctk.CTk):
             "created_at":      time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         save_config(self.config_data)
-        _log.info("Config saved for: %s", name)
+        _log.info("Config saved for: %s (model=%s)", name, model)
         self.show_control_panel()
 
     # ── Control panel ────────────────────────────────────────────────────────
 
     def show_control_panel(self):
         self.clear_window()
-        name = self.config_data.get("name", "there") if self.config_data else "there"
+        name  = (self.config_data or {}).get("name", "there")
+        model = (self.config_data or {}).get("model_name", "—")
 
         frame = ctk.CTkScrollableFrame(
             self.bg_label, fg_color="transparent", corner_radius=0,
-            scrollbar_button_color=BORDER, scrollbar_button_hover_color=TEXT_SECONDARY,
+            scrollbar_button_color=BORDER,
+            scrollbar_button_hover_color=TEXT_SECONDARY,
         )
         frame.pack(fill="both", expand=True, padx=40, pady=20)
 
@@ -370,25 +545,42 @@ class LotusApp(ctk.CTk):
         else:
             ctk.CTkLabel(frame, text="🌸", font=("SF Pro Display", 42)).pack(pady=(10, 2))
 
-        ctk.CTkLabel(frame, text=APP_NAME, font=("SF Pro Display", 32, "bold"),
-                     text_color=TEXT_PRIMARY).pack(pady=(0, 4))
+        ctk.CTkLabel(frame, text=APP_NAME,
+                     font=("SF Pro Display", 32, "bold"),
+                     text_color=TEXT_PRIMARY).pack(pady=(0, 2))
         ctk.CTkLabel(frame, text=f"Hello {name} 👋",
-                     font=("SF Pro Text", 16), text_color=TEXT_SECONDARY).pack(pady=(0, 20))
+                     font=("SF Pro Text", 15),
+                     text_color=TEXT_SECONDARY).pack(pady=(0, 4))
+
+        # Ollama model badge
+        ollama_color = GREEN if ollama_is_running() else "#555555"
+        self.ollama_badge = ctk.CTkLabel(
+            frame,
+            text=f"🤖  {model}",
+            font=("Menlo", 11),
+            text_color=ollama_color,
+        )
+        self.ollama_badge.pack(pady=(0, 16))
 
         # Status row
-        status_row = ctk.CTkFrame(frame, fg_color="transparent", corner_radius=0)
+        status_row = ctk.CTkFrame(frame, fg_color="#111111", corner_radius=8)
         status_row.pack(fill="x", pady=(0, 16), ipady=10)
 
-        self.status_icon = ctk.CTkLabel(status_row, text="⏹", font=("SF Pro Display", 22))
+        self.status_icon = ctk.CTkLabel(
+            status_row, text="⏹", font=("SF Pro Display", 22)
+        )
         self.status_icon.pack(side="left", padx=(16, 8))
 
         txt_col = ctk.CTkFrame(status_row, fg_color="transparent")
         txt_col.pack(side="left", fill="x", expand=True)
-        ctk.CTkLabel(txt_col, text="Bot Status", font=("SF Pro Text", 11),
+        ctk.CTkLabel(txt_col, text="Bot Status",
+                     font=("SF Pro Text", 11),
                      text_color=TEXT_SECONDARY, anchor="w").pack(fill="x")
-        self.status_label = ctk.CTkLabel(txt_col, text="Checking…",
-                                         font=("SF Pro Text", 14),
-                                         text_color=ACCENT, anchor="w")
+        self.status_label = ctk.CTkLabel(
+            txt_col, text="Checking…",
+            font=("SF Pro Text", 14),
+            text_color=ACCENT, anchor="w",
+        )
         self.status_label.pack(fill="x")
 
         # Buttons
@@ -396,7 +588,8 @@ class LotusApp(ctk.CTk):
             frame, text="▶  START BOT", height=48,
             font=("SF Pro Text", 13), corner_radius=0,
             fg_color="transparent", border_width=1, border_color=ACCENT,
-            hover_color="#1a1a1a", text_color=ACCENT, command=self.start_bot,
+            hover_color="#1a1a1a", text_color=ACCENT,
+            command=self.start_bot,
         )
         self.start_btn.pack(fill="x", pady=(0, 10))
 
@@ -418,9 +611,11 @@ class LotusApp(ctk.CTk):
         li_left = ctk.CTkFrame(li_row, fg_color="transparent")
         li_left.pack(side="left", fill="x", expand=True, padx=(12, 0))
         ctk.CTkLabel(li_left, text="🚀  Start on Login",
-                     font=("SF Pro Text", 13, "bold"), text_color=TEXT_PRIMARY, anchor="w").pack(fill="x")
-        ctk.CTkLabel(li_left, text="Auto-launch bot silently when you log in",
-                     font=("SF Pro Text", 11), text_color=TEXT_SECONDARY, anchor="w").pack(fill="x")
+                     font=("SF Pro Text", 13, "bold"),
+                     text_color=TEXT_PRIMARY, anchor="w").pack(fill="x")
+        ctk.CTkLabel(li_left, text="Auto-launch bot silently at login",
+                     font=("SF Pro Text", 11),
+                     text_color=TEXT_SECONDARY, anchor="w").pack(fill="x")
 
         self.startup_switch = ctk.CTkSwitch(
             li_row, text="", width=52, onvalue=True, offvalue=False,
@@ -431,11 +626,10 @@ class LotusApp(ctk.CTk):
         if is_startup_enabled():
             self.startup_switch.select()
 
-        # Info row
-        info_row = ctk.CTkFrame(frame, fg_color="transparent", corner_radius=0)
-        info_row.pack(fill="x", pady=(0, 10), ipady=4)
-        ctk.CTkLabel(info_row, text="🔒  Closing this window keeps the bot running",
-                     font=("SF Pro Text", 12), text_color=TEXT_SECONDARY, anchor="w").pack(fill="x", padx=12)
+        ctk.CTkLabel(
+            frame, text="🔒  Closing this window keeps the bot running",
+            font=("SF Pro Text", 12), text_color=TEXT_SECONDARY, anchor="w",
+        ).pack(fill="x", padx=12, pady=(0, 8))
 
         ctk.CTkFrame(frame, height=1, fg_color=BORDER).pack(fill="x", pady=10)
 
@@ -448,7 +642,8 @@ class LotusApp(ctk.CTk):
             font=("SF Pro Text", 13), corner_radius=8,
             fg_color="transparent", hover_color=BORDER,
             border_width=1, border_color=BORDER,
-            text_color=TEXT_SECONDARY, command=self.change_settings,
+            text_color=TEXT_SECONDARY,
+            command=self.change_settings,
         ).pack(side="left", expand=True, fill="x", padx=(0, 5))
 
         ctk.CTkButton(
@@ -456,23 +651,28 @@ class LotusApp(ctk.CTk):
             font=("SF Pro Text", 13), corner_radius=8,
             fg_color="transparent", hover_color=BORDER,
             border_width=1, border_color=BORDER,
-            text_color="#ff9966", command=self.reset_setup,
+            text_color=RED,
+            command=self.reset_setup,
         ).pack(side="right", expand=True, fill="x", padx=(5, 0))
 
         # Log viewer
-        ctk.CTkLabel(frame, text="Console Output", font=("SF Pro Text", 12),
-                     text_color=TEXT_SECONDARY, anchor="w").pack(fill="x", pady=(16, 4))
+        ctk.CTkLabel(
+            frame, text="Console Output",
+            font=("SF Pro Text", 12), text_color=TEXT_SECONDARY, anchor="w",
+        ).pack(fill="x", pady=(16, 4))
 
         self.log_box = ctk.CTkTextbox(
             frame, height=120, font=("Menlo", 11),
-            fg_color="transparent", text_color=TEXT_SECONDARY,
+            fg_color="#0d0d0d", text_color="#66bb6a",
             border_width=1, border_color=BORDER, corner_radius=0,
             state="disabled",
         )
         self.log_box.pack(fill="x")
 
-        ctk.CTkLabel(frame, text="macOS Control Agent",
-                     font=("SF Pro Text", 10), text_color="#444444").pack(pady=(10, 0))
+        ctk.CTkLabel(
+            frame, text="macOS Remote Control Agent",
+            font=("SF Pro Text", 10), text_color="#333333",
+        ).pack(pady=(10, 0))
 
         self.log("Lotus ready.")
         self._poll_bot_status()
@@ -519,8 +719,10 @@ class LotusApp(ctk.CTk):
         try:
             if running:
                 pid = _get_bot_pid()
-                self.status_label.configure(text=f"Running (PID {pid})", text_color=TEXT_PRIMARY)
-                self.status_icon.configure(text="✅")
+                self.status_label.configure(
+                    text=f"Running  (PID {pid})", text_color=GREEN
+                )
+                self.status_icon.configure(text="🟢")
                 self.start_btn.configure(state="disabled")
                 self.stop_btn.configure(state="normal")
             else:
@@ -563,7 +765,7 @@ class LotusApp(ctk.CTk):
         self.after(0, lambda: self.log("⏹ Bot stopped."))
         self.after(0, lambda: self._update_ui_status(False))
 
-    # ── Login item toggle ─────────────────────────────────────────────────
+    # ── Login item ────────────────────────────────────────────────────────
 
     def toggle_startup(self):
         if self.startup_switch.get():
@@ -615,7 +817,7 @@ class LotusApp(ctk.CTk):
             self.token_entry.insert(0, self.config_data.get("telegram_token", ""))
             self.ids_entry.insert(0, self.config_data.get("allowed_user_id", ""))
             self.name_entry.insert(0, self.config_data.get("name", ""))
-            self.model_entry.insert(0, self.config_data.get("model_name", "phi3"))
+            self.model_picker.set(self.config_data.get("model_name", "phi3"))
 
     def reset_setup(self):
         if _is_bot_alive():
@@ -626,7 +828,7 @@ class LotusApp(ctk.CTk):
         self.show_setup()
 
     def on_close(self):
-        _log.info("Window closed — hiding to background (bot keeps running)")
+        _log.info("Window closed — hiding to background")
         self.withdraw()
 
     def show_window(self):
@@ -647,18 +849,19 @@ class LotusApp(ctk.CTk):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--bot-service", action="store_true",
-                        help="Run background bot service (no GUI)")
+    parser.add_argument(
+        "--bot-service", action="store_true",
+        help="Run background bot service only (no GUI)"
+    )
     args, _ = parser.parse_known_args()
 
     if args.bot_service:
-        # Launched as background service (e.g. from launchd)
         sys.path.insert(0, str(SRC_DIR))
         from bot_service import run_service
         run_service()
         sys.exit(0)
 
-    # Pre-launch bot before GUI loads (faster perceived startup)
+    # Pre-launch bot before GUI loads for faster perceived startup
     _cfg = load_config()
     if _cfg and _cfg.get("telegram_token") and not _is_bot_alive():
         try:
