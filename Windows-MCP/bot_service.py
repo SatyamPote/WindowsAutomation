@@ -26,9 +26,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
 DATA_DIR = os.path.join(PROGRAM_DATA, "Lotus")
 
+# Config is now in the app directory for easier manual access
+if getattr(sys, 'frozen', False):
+    CONFIG_FILE = os.path.join(os.path.dirname(sys.executable), "config.json")
+else:
+    CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
 PID_FILE = os.path.join(DATA_DIR, "lotus_bot.pid")
 LOG_FILE = os.path.join(DATA_DIR, "logs", "bot_service.log")
-CONFIG_FILE = os.path.join(DATA_DIR, "config", "config.json")
 
 BOT_SCRIPT = os.path.join(BASE_DIR, "src", "windows_mcp", "telegram_bot.py")
 BOT_SRC_DIR = os.path.join(BASE_DIR, "src")
@@ -113,8 +118,8 @@ def run_service():
         sys.exit(0)
 
     config = load_config()
-    if not config or not config.get("bot_token"):
-        _log.error("No config.json or missing bot_token. Run the Lotus app first for setup.")
+    if not config or (not config.get("telegram_token") and not config.get("bot_token")):
+        _log.error("No config.json or missing token. Run the Lotus app first for setup.")
         sys.exit(1)
 
     # Write PID
@@ -134,8 +139,8 @@ def run_service():
         sys.path.insert(0, BOT_SRC_DIR)
 
     # Set env vars from config
-    os.environ["TELEGRAM_BOT_TOKEN"] = config.get("bot_token", "")
-    os.environ["TELEGRAM_ALLOWED_USER_IDS"] = config.get("allowed_user_ids", "")
+    os.environ["TELEGRAM_BOT_TOKEN"] = config.get("telegram_token") or config.get("bot_token", "")
+    os.environ["TELEGRAM_ALLOWED_USER_IDS"] = str(config.get("allowed_user_id") or config.get("allowed_user_ids", ""))
 
     # Change to BASE_DIR so relative paths in bot code work
     os.chdir(BASE_DIR)
@@ -150,7 +155,7 @@ def run_service():
 
             # Import and run the bot directly (in-process, no subprocess)
             from windows_mcp.telegram_bot import run_bot
-            run_bot(token=config["bot_token"])
+            run_bot(token=config.get("telegram_token") or config.get("bot_token"))
 
             # If run_bot returns normally, bot was stopped cleanly
             _log.info("Bot stopped normally.")

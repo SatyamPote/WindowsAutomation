@@ -27,12 +27,17 @@ if os.path.exists(MCP_SRC) and MCP_SRC not in sys.path:
     sys.path.insert(0, MCP_SRC)
 
 PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
-BASE_DIR = os.path.join(PROGRAM_DATA, "Lotus")
-CONFIG_FILE = os.path.join(BASE_DIR, "config", "config.json")
-LOG_FILE    = os.path.join(BASE_DIR, "logs", "lotus_app.log")
-PID_FILE    = os.path.join(BASE_DIR, "lotus_bot.pid")
-os.makedirs(os.path.join(BASE_DIR, "config"), exist_ok=True)
-os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
+APP_DATA_DIR = os.path.join(PROGRAM_DATA, "Lotus")
+
+# Config is now in the app directory for easier manual access
+if getattr(sys, 'frozen', False):
+    CONFIG_FILE = os.path.join(os.path.dirname(sys.executable), "config.json")
+else:
+    CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+LOG_FILE = os.path.join(APP_DATA_DIR, "logs", "lotus_app.log")
+PID_FILE = os.path.join(APP_DATA_DIR, "lotus_bot.pid")
+os.makedirs(os.path.join(APP_DATA_DIR, "logs"), exist_ok=True)
 
 # ── File logger (failsafe — always active) ──
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -164,7 +169,7 @@ def _load_background() -> ctk.CTkImage | None:
         bg_path = os.path.join(APP_DIR, "assets", "bg_pond.png")
         if os.path.exists(bg_path):
             img = Image.open(bg_path).convert("RGBA")
-            return ctk.CTkImage(light_image=img, dark_image=img, size=(400, 660))
+            return ctk.CTkImage(light_image=img, dark_image=img, size=(400, 600))
         else:
             _log.error("Background image NOT FOUND at: %s", bg_path)
     except Exception as e:
@@ -228,7 +233,7 @@ def _start_bot_service():
 
     subprocess.Popen(
         args,
-        cwd=BASE_DIR,
+        cwd=APP_DATA_DIR,
         creationflags=DETACHED_PROCESS | CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP,
         close_fds=True,
         start_new_session=True,
@@ -269,7 +274,7 @@ class LotusApp(ctk.CTk):
         _log.info("=== Lotus app started ===")
 
         self.title("Lotus")
-        self.geometry("400x780")
+        self.geometry("400x600")
         self.resizable(False, False)
         self.configure(fg_color="#1a1a1a") # Fallback color
 
@@ -408,9 +413,10 @@ class LotusApp(ctk.CTk):
             return
 
         self.config = {
-            "bot_token":          token,
-            "allowed_user_ids":   user_ids,
-            "user_name":          name,
+            "name":               name,
+            "telegram_token":     token,
+            "allowed_user_id":    user_ids,
+            "model":              "phi3", # Default to phi3 if not set
             "created_at":         time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         save_config(self.config)
@@ -422,16 +428,16 @@ class LotusApp(ctk.CTk):
     # ──────────────────────────────────────────────
     def show_control_panel(self):
         self.clear_window()
-        name = self.config.get("user_name", "User")
+        name = self.config.get("name") or self.config.get("user_name", "User")
 
         frame = ctk.CTkScrollableFrame(
             self.bg_label, fg_color="transparent", corner_radius=0,
             scrollbar_button_color=BORDER, scrollbar_button_hover_color=TEXT_SECONDARY
         )
-        frame.pack(fill="both", expand=True, padx=40, pady=30)
+        frame.pack(fill="both", expand=True, padx=40, pady=20)
 
         # Header
-        _logo = _load_logo(90)
+        _logo = _load_logo(70)
         if _logo:
             ctk.CTkLabel(frame, image=_logo, text="").pack(pady=(10, 2))
         else:
@@ -597,7 +603,7 @@ class LotusApp(ctk.CTk):
     def _poll_bot_logs(self):
         """Continuously stream bot_service.log into the UI log box."""
         try:
-            bot_log_path = os.path.join(PROGRAM_DATA, "Lotus", "logs", "bot_service.log")
+            bot_log_path = os.path.join(APP_DATA_DIR, "logs", "bot_service.log")
             if os.path.exists(bot_log_path):
                 current_size = os.path.getsize(bot_log_path)
                 if current_size > self._last_log_size:
@@ -745,9 +751,9 @@ class LotusApp(ctk.CTk):
         self.show_setup()
         # Pre-fill existing values
         if self.config:
-            self.token_entry.insert(0, self.config.get("bot_token", ""))
-            self.ids_entry.insert(0, self.config.get("allowed_user_ids", ""))
-            self.name_entry.insert(0, self.config.get("user_name", ""))
+            self.token_entry.insert(0, self.config.get("telegram_token") or self.config.get("bot_token", ""))
+            self.ids_entry.insert(0, self.config.get("allowed_user_id") or self.config.get("allowed_user_ids", ""))
+            self.name_entry.insert(0, self.config.get("name") or self.config.get("user_name", ""))
 
     def reset_setup(self):
         if _is_bot_alive():
