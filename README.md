@@ -2,7 +2,7 @@
 
 <img width="500" height="500" alt="Lotus Logo" src="https://github.com/user-attachments/assets/47150caa-e1dc-4cf7-a351-f06af310194a" />
 
-# 🪷 Lotus: The Ghost Update
+# 🌸 Lotus
 
 ### AI-Powered Windows Control Agent
 
@@ -11,7 +11,7 @@
 [![Platform](https://img.shields.io/badge/platform-Windows%207--11-blue)](https://github.com)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram&logoColor=white)](https://core.telegram.org/bots)
 
-**Control your entire Windows PC remotely through Telegram — now with Ghost Transparency & Contact Engine.**
+**Lotus** is a sophisticated, local Windows automation agent that provides seamless remote control of your workstation via Telegram. By bridging the gap between mobile convenience and desktop power, Lotus enables you to manage applications, navigate file systems, execute complex system actions, and communicate through WhatsApp—all through a secure, real-time command interface.
 
 [Features](#-features) · [Installation](#-installation) · [Commands](#-telegram-bot-commands) · [Security](#-security)
 
@@ -20,10 +20,10 @@
 ---
 
 ### 🌟 Featured Release
-*   **Ghost UI:** A 100% transparent control panel that floats elegantly on your desktop.
-*   **WhatsApp Contact Engine:** Save contacts with `/add` and message them by name.
-*   **Smart Power Management:** Remote `shutdown`, `restart`, and `sleep` with safety confirmations.
-*   **Persistent Background Service:** Silent, high-performance execution from the moment you boot.
+*   **Ghost UI:** A premium, 100% transparent control panel that integrates elegantly with your desktop wallpaper.
+*   **Intelligent Contact Engine:** Full WhatsApp Desktop support with a dedicated Contact Manager (`/add`, `/contacts`).
+*   **Natural Language Processing:** Lotus interprets conversational commands like "take a screenshot and send it to John".
+*   **Silent Background Operation:** High-performance service execution with zero-latency response and minimal system footprint.
 
 ---
 

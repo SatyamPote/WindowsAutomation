@@ -317,7 +317,7 @@ class LotusApp(ctk.CTk):
         if _logo:
             ctk.CTkLabel(frame, image=_logo, text="").pack(pady=(10, 2))
         else:
-            ctk.CTkLabel(frame, text="🪷", font=("Segoe UI Emoji", 44)).pack(pady=(10, 2))
+            ctk.CTkLabel(frame, text="🌸", font=("Segoe UI Emoji", 44)).pack(pady=(10, 2))
         ctk.CTkLabel(
             frame, text=APP_NAME, font=("Segoe UI", 32, "bold"),
             text_color="#ffffff"
@@ -425,7 +425,7 @@ class LotusApp(ctk.CTk):
         if _logo:
             ctk.CTkLabel(frame, image=_logo, text="").pack(pady=(10, 2))
         else:
-            ctk.CTkLabel(frame, text="🪷", font=("Segoe UI Emoji", 42)).pack(pady=(10, 2))
+            ctk.CTkLabel(frame, text="🌸", font=("Segoe UI Emoji", 42)).pack(pady=(10, 2))
         ctk.CTkLabel(
             frame, text=APP_NAME, font=("Segoe UI", 32, "bold"),
             text_color=TEXT_PRIMARY
