@@ -1,20 +1,15 @@
-# Lotus - Windows Control Agent
-# Core
 python-telegram-bot>=20.0
 python-dotenv
 psutil
-
-# Desktop UI
 customtkinter
-
-# Automation
 pyautogui
 pygetwindow
 Pillow
-
-# Media
-# mpv (external binary, not pip package)
 yt-dlp
-
-# Voice (TTS)
 pyttsx3
+pystray
+rich
+requests
+pyperclip
+thefuzz
+python-Levenshtein

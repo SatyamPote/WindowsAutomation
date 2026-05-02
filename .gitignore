@@ -1,2 +1,55 @@
-storage/*
-!storage/.keep
+# ── Lotus .gitignore ──────────────────────────────────
+
+# User data & generated files
+storage/
+logs/
+dist/
+build/
+*.spec
+
+# Media files
+*.mp4
+*.mp3
+*.wav
+*.webm
+*.zip
+*.tar.gz
+*.avi
+*.mkv
+
+# Images (bulk downloads)
+storage/images/
+storage/videos/
+storage/audio/
+storage/temp/
+
+# Config (contains secrets)
+config.json
+config/config.json
+Windows-MCP/.env
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Windows
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# PID files
+*.pid
+
+# Installer output
+Output/

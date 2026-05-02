@@ -29,8 +29,8 @@ _DL_TUI_SCRIPT = os.path.join(_THIS_DIR, "download_tui.py")
 
 def _get_storage_dir(subdir: str = "downloads") -> str:
     """Get storage directory, creating if needed."""
-    project_root = os.path.abspath(os.path.join(_THIS_DIR, "..", "..", ".."))
-    base = os.path.join(project_root, "storage", subdir)
+    PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
+    base = os.path.join(PROGRAM_DATA, "Lotus", "storage", subdir)
     os.makedirs(base, exist_ok=True)
     return base
 

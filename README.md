@@ -320,12 +320,13 @@ TELEGRAM_ALLOWED_USER_IDS=123456789
 
 | Command | Description |
 |:---|:---|
-| `/start` | Welcome screen with 8 quick-action buttons + real examples |
-| `/help` | 3-page detailed command guide with usage examples |
+| `/start` | Welcome screen with quick-action buttons + real examples |
+| `/help` | Detailed command guide with usage examples |
+| `/add <name> : <num>` | Save a WhatsApp contact (e.g. `/add John : +1234...`) |
+| `/contacts` | View your list of saved WhatsApp contacts |
 | `/owner` | Developer info — Satyam Pote, GitHub, email, project |
-| `/admin` | Same as `/owner` |
 | `/logs` | View last 20 activity log entries |
-| `/storage` | Show storage usage (current MB / 2048 MB) + file count |
+| `/storage` | Show storage usage (current MB / 2048 MB) |
 | `/status` | Live CPU & RAM usage |
 
 #### `/start` Preview
@@ -488,14 +489,14 @@ Bot:  ✅ Deleted: report.pdf
 |:---|:---|
 | `take screenshot` | Capture and send screenshot |
 | `send screenshot` | Send most recent screenshot |
-| `lock` | Lock the workstation |
-| `sleep` | Put PC to sleep |
-| `shutdown` | Shutdown PC (⚠️ confirmation) |
-| `restart` | Restart PC (⚠️ confirmation) |
+| `lock` / `sleep` | Lock or put PC to sleep |
+| `shutdown` / `restart`| System power control (⚠️ confirmation) |
 | `search <query>` | Open Google search in browser |
-| `send <msg> to <name>` | Send WhatsApp message |
-| `show logs` / `clear logs` | View/clear activity logs |
+| `add contact <n> : <u>`| Save WhatsApp contact via natural language |
+| `send <msg> to <name>` | Send WhatsApp message to saved contact |
+| `show logs` | View activity logs |
 | `storage status` | Show storage usage |
+
 
 **Usage Examples:**
 ```
@@ -765,13 +766,11 @@ pytest                     # Run tests
 - **Anonymous Telemetry** — only tool names + errors (opt-out with `ANONYMIZED_TELEMETRY=false`)
 - **Recommended** — use VM or Windows Sandbox for MCP server
 
-### Sensitive Files (Never Commit)
-
-| File | Contains |
-|:---|:---|
-| `.env` | API keys and tokens |
-| `config.json` | Bot token + user IDs |
-| `logs/` | Command history |
+### 🔒 Data Privacy & Standalone Installation
+- **Local Storage:** All your secrets (Bot Token, Chat IDs) are stored **locally** on your PC in `C:\ProgramData\Lotus\config\config.json`.
+- **Portability:** If you send the `LotusSetup.exe` to a friend, they can install it, but **they will NOT see your data**.
+- **Self-Configuration:** The app detects it is a "new install" on their PC and will prompt them to enter their own secrets.
+- **Security:** Your configuration is never uploaded or shared. Only your authorized Telegram ID can control your machine.
 
 ---
 

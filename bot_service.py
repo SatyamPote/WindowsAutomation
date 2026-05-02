@@ -22,9 +22,13 @@ import signal
 
 # ── Paths ──
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PID_FILE = os.path.join(BASE_DIR, "lotus_bot.pid")
-LOG_FILE = os.path.join(BASE_DIR, "logs", "bot_service.log")
-CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+
+PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
+DATA_DIR = os.path.join(PROGRAM_DATA, "Lotus")
+
+PID_FILE = os.path.join(DATA_DIR, "lotus_bot.pid")
+LOG_FILE = os.path.join(DATA_DIR, "logs", "bot_service.log")
+CONFIG_FILE = os.path.join(DATA_DIR, "config", "config.json")
 
 BOT_SCRIPT = os.path.join(BASE_DIR, "Windows-MCP", "src", "windows_mcp", "telegram_bot.py")
 BOT_SRC_DIR = os.path.join(BASE_DIR, "Windows-MCP", "src")
@@ -70,10 +74,12 @@ def remove_pid():
 def load_config() -> dict | None:
     if os.path.exists(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, "r") as f:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            _log.error("Failed to load config.json: %s", e)
+    else:
+        _log.error("CONFIG_FILE does not exist at %s", CONFIG_FILE)
     return None
 
 

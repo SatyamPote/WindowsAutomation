@@ -35,10 +35,11 @@ from windows_mcp.media.downloader import download_manager
 logger = logging.getLogger(__name__)
 
 # Directory Setup
-BASE_DIR = os.getcwd()
+PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
+BASE_DIR = os.path.join(PROGRAM_DATA, "Lotus")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 STORAGE_DIR = os.path.join(BASE_DIR, "storage")
-DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_DIR = os.path.join(BASE_DIR, "config") # Use config for persistence as per requirement
 
 STORAGE_FILES = os.path.join(STORAGE_DIR, "files")
 STORAGE_VIDEOS = os.path.join(STORAGE_DIR, "videos")
@@ -128,21 +129,40 @@ def _take_screenshot() -> Image.Image:
 
 
 
+# Common typo → correct spelling table
+TYPO_MAP = {
+    'watsapp': 'whatsapp', 'whatsup': 'whatsapp', 'waatsapp': 'whatsapp',
+    'calculater': 'calculator', 'calculatr': 'calculator',
+    'notpad': 'notepad', 'noetpad': 'notepad',
+    'chorme': 'chrome', 'crhome': 'chrome', 'goggle': 'google',
+    'spootify': 'spotify', 'spotfy': 'spotify',
+    'downlod': 'download', 'downlaod': 'download',
+    'screnshot': 'screenshot', 'screenshoot': 'screenshot',
+    'serach': 'search', 'seach': 'search',
+    'youtub': 'youtube', 'yotube': 'youtube',
+    'colse': 'close', 'clos': 'close',
+    'opn': 'open', 'ope ': 'open ',
+    'plya': 'play', 'palY': 'play',
+    'voume': 'volume', 'volme': 'volume',
+    'pasue': 'pause', 'paus': 'pause',
+    'shutdwon': 'shutdown', 'shtudown': 'shutdown',
+    'restrat': 'restart', 'restat': 'restart',
+}
+
 def clean_input(text: str) -> str:
     # Fix merged words and spaces
     text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
     t = text.strip().lower()
-    
-    # Aggressive normalization
+    # Apply typo corrections
+    for wrong, right in TYPO_MAP.items():
+        t = t.replace(wrong, right)
+    # Remove conversational fillers
     fillers = [
-        r'\bapplication\b', r'\baplication\b', r'\bsoftware\b', 
+        r'\bapplication\b', r'\baplication\b', r'\bsoftware\b',
         r'\bcan you\b', r'\bplease\b', r'\bsong\b'
     ]
     for f in fillers:
         t = re.sub(f, '', t)
-    
-    # Fix common typos
-    t = t.replace('watsapp', 'whatsapp')
     return t.strip()
 
 def clear_temp_cache(context: ContextTypes.DEFAULT_TYPE):
@@ -589,6 +609,55 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
             return {"success": True, "message": f"📂 Moved to: `{context.user_data['cwd']}`"}
         return {"success": False, "message": f"Folder '{target}' not found."}
 
+    # ── PRIORITY 0b: Admin & System Commands ──
+    if text.strip() == "/admin":
+        return {"success": True, "message": "👤 *Owner Info*\n\nName: Satyam Pote\nEmail: satyampote9999@gmail.com\nGitHub: https://github.com/SatyamPote"}
+
+    if t == "restart bot":
+        logger.info("Restart requested via Telegram")
+        context.user_data["pending_confirm"] = {"action": "restart bot", "time": time.time()}
+        return {"success": True, "message": "⚠️ Are you sure you want to **restart the bot**?\nReply `yes` to confirm."}
+
+    if t == "update lotus":
+        logger.info("Update check requested")
+        try:
+            import requests as _req
+            r = _req.get("https://api.github.com/repos/SatyamPote/Lotus/releases/latest", timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                latest = data.get("tag_name", "unknown")
+                current = "v2.0"
+                if latest != current:
+                    url = data.get("html_url", "https://github.com/SatyamPote/Lotus/releases")
+                    return {"success": True, "message": f"🆕 *New version available!*\n\nLatest: `{latest}`\nCurrent: `{current}`\n\n[Download here]({url})"}
+                return {"success": True, "message": f"✅ You're on the latest version (`{current}`)."}
+            return {"success": False, "message": "⚠️ Could not reach GitHub. Check your internet."}
+        except Exception as e:
+            return {"success": False, "message": f"❌ Update check failed: {e}"}
+
+    if t == "show logs":
+        log_file = os.path.join(LOG_DIR, "activity_log.txt")
+        if os.path.exists(log_file):
+            return {"success": True, "message": f"__SEND_FILE__:{log_file}"}
+        return {"success": False, "message": "No logs found."}
+
+    if t == "clear logs":
+        log_file = os.path.join(LOG_DIR, "activity_log.txt")
+        try:
+            if os.path.exists(log_file): os.remove(log_file)
+            return {"success": True, "message": "Logs cleared."}
+        except Exception as e:
+            return {"success": False, "message": f"Failed to clear logs: {e}"}
+
+    if t == "storage status":
+        all_files = []
+        for root, _, fnames in os.walk(STORAGE_DIR):
+            for fn in fnames:
+                fp = os.path.join(root, fn)
+                if os.path.isfile(fp): all_files.append(fp)
+        total_size = sum(os.path.getsize(f) for f in all_files) / (1024*1024)
+        return {"success": True, "message": f"📦 *Storage Status*\n━━━━━━━━━\n📂 *Path:* `{STORAGE_DIR}`\n📊 *Size:* {total_size:.2f} MB / 2048 MB (2 GB)\n📁 *Files:* {len(all_files)}"}
+
     # ── PRIORITY 1: Music Control ──
     if first_word in ["play", "pause", "resume", "stop", "volume", "next"]:
         logger.info(f"Intent: MUSIC ({first_word})")
@@ -724,8 +793,19 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
         return res
 
     # ── PRIORITY 3: Messaging (WhatsApp) ──
-    if first_word == "send" and " to " in t:
-        logger.info(f"Intent: MESSAGING")
+        # WhatsApp Contact Management
+        if t.startswith("add contact"):
+            rest = t[11:].strip()
+            if ":" in rest:
+                name, phone = rest.split(":", 1)
+                res = add_contact(name.strip(), phone.strip())
+                return {"success": True, "message": res}
+            return {"success": False, "message": "Usage: `add contact Name : Number`"}
+
+        if t in ["my contacts", "show contacts", "view contacts", "list contacts"]:
+            return {"success": True, "message": format_contacts()}
+
+        # WhatsApp Messaging
         send_match = re.search(r'^send\s+(.+?)\s+to\s+(.+?)$', t)
         if send_match:
             payload, name = send_match.group(1).strip(), send_match.group(2).strip()
@@ -963,105 +1043,49 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
 
 @require_auth
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    user_id = str(update.effective_user.id)
-    users = load_users()
     name = update.effective_user.first_name
-
-    if user_id not in users:
-        users[user_id] = {"name": name, "last_seen": time.time()}
-        save_user(user_id, users[user_id])
-        text = (
-            f"Hello {name} 👋\n"
-            f"Welcome to *Lotus* — your Windows Control Agent.\n\n"
-            f"🎵 `play kesariya`\n"
-            f"📥 `download youtube <url>`\n"
-            f"🖥️ `openapp chrome`\n"
-            f"📁 `find report.pdf`\n"
-            f"🔊 `speak hello world`\n"
-            f"📸 `take screenshot`\n"
-            f"🔗 `open chrome and play music`\n\n"
-            f"Type /help for the full command guide."
-        )
-    else:
-        name = users[user_id].get("name", name)
-        h = int(time.strftime("%H"))
-        period = "Morning" if h < 12 else "Afternoon" if h < 18 else "Evening"
-        text = (
-            f"Good {period}, {name}! 👋\n"
-            f"Welcome back to *Lotus*.\n\n"
-            f"• `play arijit singh`\n"
-            f"• `openapp spotify`\n"
-            f"• `download images cars`\n"
-            f"• `dashboard` (daily stats)\n"
-            f"• `take screenshot`\n\n"
-            f"Type /help for all commands."
-        )
-
-    keyboard = [
-        [InlineKeyboardButton("🎵 Music", callback_data="media"),
-         InlineKeyboardButton("📥 Downloads", callback_data="downloads"),
-         InlineKeyboardButton("🖥️ Apps", callback_data="tools")],
-        [InlineKeyboardButton("📁 Files", callback_data="files"),
-         InlineKeyboardButton("📸 Screenshot", callback_data="tools"),
-         InlineKeyboardButton("⚙️ System", callback_data="system")],
-        [InlineKeyboardButton("📊 Status", callback_data="status"),
-         InlineKeyboardButton("📋 Full Help", callback_data="help")],
-    ]
-    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    help_text = (
+        f"🌸 *Welcome to Lotus, {name}!* 👋\n"
+        "Your Personal Windows AI Control System.\n\n"
+        "📁 *File & Folders*\n"
+        "• `ls` / `cd` — Navigate PC\n"
+        "• `find <file>` — Locate files\n"
+        "• `send <file>` — Get file from PC\n\n"
+        "🎵 *Media & Downloads*\n"
+        "• `play <song>` — Play on PC\n"
+        "• `download youtube <url>` — Save videos\n"
+        "• `download images <topic>` — Bulk save\n\n"
+        "💬 *WhatsApp*\n"
+        "• `/add <name> : <number>` — Save contact\n"
+        "• `/contacts` — View saved list\n"
+        "• `send <msg> to <name>` — Send WhatsApp\n\n"
+        "🖥️ *System*\n"
+        "• `screenshot` — View desktop\n"
+        "• `lock` / `sleep` / `shutdown`\n"
+        "• `dashboard` — System stats\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "💡 *Tip:* You can type naturally, e.g., 'hey lotus please play some lo-fi music'."
+    )
+    await update.message.reply_text(help_text, parse_mode="Markdown")
 
 @require_auth
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    help_text = (
-        "📖 *Lotus — Command Guide*\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🎵 *MUSIC*\n"
-        "• `play <song>` — _e.g._ `play kesariya`\n"
-        "• `pause` · `resume` · `stop` · `next`\n"
-        "• `volume up` · `volume down`\n\n"
-        "📥 *DOWNLOADS*\n"
-        "• `download youtube <url>`\n"
-        "  _Asks: 360p / 720p / 1080p / MP3_\n"
-        "• `download images <topic>`\n"
-        "  _e.g._ `download images cars`\n"
-        "• `download <url>` — any file\n"
-        "• `download cancel`\n\n"
-        "🔊 *VOICE*\n"
-        "• `speak <text>` — _e.g._ `speak hello`\n\n"
-        "🖥️ *APPS*\n"
-        "• `openapp <name>` — _e.g._ `openapp chrome`\n"
-        "• `close <name>` · `close all apps`\n\n"
-        "📁 *FILES*\n"
-        "• `ls` · `cd <folder>` · `cd ..`\n"
-        "• `find <file>` — _e.g._ `find report`\n"
-        "• `open <file>` · `send <file>`\n"
-        "• `delete <file>` (⚠️ confirmation)\n\n"
-        "⚡ *SYSTEM & TOOLS*\n"
-        "• `take screenshot` · `send screenshot`\n"
-        "• `lock` · `sleep`\n"
-        "• `shutdown` · `restart` (⚠️ confirmation)\n"
-        "• `search <query>`\n"
-        "• `dashboard` — Daily stats & battery\n"
-        "• `storage status` · `show logs`\n"
-        "• `clipboard` — Show last 5 copied items\n"
-        "• `clear clipboard` · `copy <text>`\n\n"
-        "🧠 *COMMAND MEMORY*\n"
-        "• `set <name> = <actions>`\n"
-        "  _e.g._ `set study = open chrome and play lofi`\n"
-        "• `memory list` — Show saved commands\n"
-        "• `forget <name>` — Delete saved command\n\n"
-        "🔗 *MULTI-COMMAND & QUEUE*\n"
-        "• `open chrome and play music`\n"
-        "• `take screenshot then send screenshot`\n"
-        "  _Multiple commands are auto-queued._\n\n"
-        "⌨️ *SLASH COMMANDS*\n"
-        "• /start · /help · /owner · /admin\n"
-        "• /logs · /storage · /status\n\n"
-        "🔋 _Auto voice-alerts sent when battery <20%_\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n"
-        "_All commands are case-insensitive._\n"
-        "_⚠️ Dangerous commands require yes/no (10s)._"
-    )
-    await update.message.reply_text(help_text, parse_mode="Markdown")
+    await cmd_start(update, context)
+
+@require_auth
+async def cmd_add_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/add <name> : <number>"""
+    msg = update.message.text[5:].strip()
+    if ":" not in msg:
+        await update.message.reply_text("❌ Usage: `/add Name : +1234567890`", parse_mode="Markdown")
+        return
+    name, phone = msg.split(":", 1)
+    res = add_contact(name.strip(), phone.strip())
+    await update.message.reply_text(f"✅ {res}")
+
+@require_auth
+async def cmd_contacts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(format_contacts(), parse_mode="Markdown")
 
 @require_auth
 async def cmd_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1238,6 +1262,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             action = pending_confirm["action"]
             if action == "close all apps":
                 await update.message.reply_text(close_all_apps())
+            elif action == "restart bot":
+                await update.message.reply_text("♻️ Restarting bot service...")
+                import threading as _threading
+                def _do_restart():
+                    import time as _t, os as _os, sys as _sys, subprocess as _sp
+                    _t.sleep(1)
+                    # re-launch this process then exit current
+                    PROGRAM_DATA = _os.environ.get("PROGRAMDATA", "C:\\ProgramData")
+                    pid_file = _os.path.join(PROGRAM_DATA, "Lotus", "lotus_bot.pid")
+                    try:
+                        if _os.path.exists(pid_file): _os.remove(pid_file)
+                    except: pass
+                    _os.execv(_sys.executable, [_sys.executable] + _sys.argv)
+                _threading.Thread(target=_do_restart, daemon=True).start()
             else:
                 res = await execute_system_cmd(action)
                 await update.message.reply_text(f"✅ {res.get('message', 'Done')}")
@@ -1356,21 +1394,14 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def _load_config_token() -> str | None:
     """Load bot token from config.json if it exists."""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Try multiple levels up to find the root config.json
-    possible_paths = [
-        os.path.join(os.getcwd(), "config.json"),
-        os.path.abspath(os.path.join(script_dir, "..", "..", "..", "config.json")), # Root
-        os.path.abspath(os.path.join(script_dir, "..", "..", "config.json")),       # Windows-MCP root
-    ]
-    for config_path in possible_paths:
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, 'r') as f:
-                    cfg = json.load(f)
-                return cfg.get("bot_token")
-            except Exception:
-                continue
+    PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
+    config_path = os.path.join(PROGRAM_DATA, "Lotus", "config", "config.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                return json.load(f).get("bot_token")
+        except Exception:
+            pass
     return None
 
 def run_bot(token: str = None) -> None:
@@ -1393,23 +1424,17 @@ def run_bot(token: str = None) -> None:
         raise SystemExit("TELEGRAM_BOT_TOKEN not set. Run Lotus app or set env var.")
     
     # Also load allowed user IDs from config if present
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    possible_paths = [
-        os.path.join(os.getcwd(), "config.json"),
-        os.path.abspath(os.path.join(script_dir, "..", "..", "..", "config.json")),
-        os.path.abspath(os.path.join(script_dir, "..", "..", "config.json")),
-    ]
-    for config_path in possible_paths:
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, 'r') as f:
-                    cfg = json.load(f)
-                allowed = cfg.get("allowed_user_ids", "")
-                if allowed and not os.getenv("TELEGRAM_ALLOWED_USER_IDS"):
-                    os.environ["TELEGRAM_ALLOWED_USER_IDS"] = allowed
-                break # Found it
-            except Exception:
-                continue
+    PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
+    config_path = os.path.join(PROGRAM_DATA, "Lotus", "config", "config.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                cfg = json.load(f)
+            allowed = cfg.get("allowed_user_ids", "")
+            if allowed and not os.getenv("TELEGRAM_ALLOWED_USER_IDS"):
+                os.environ["TELEGRAM_ALLOWED_USER_IDS"] = allowed
+        except Exception:
+            pass
 
     from telegram.request import HTTPXRequest
     request = HTTPXRequest(read_timeout=300, write_timeout=300, connect_timeout=300)
@@ -1418,6 +1443,8 @@ def run_bot(token: str = None) -> None:
     
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("add", cmd_add_contact))
+    app.add_handler(CommandHandler("contacts", cmd_contacts))
     app.add_handler(CommandHandler("owner", cmd_owner))
     app.add_handler(CommandHandler("admin", cmd_owner))
     app.add_handler(CommandHandler("logs", cmd_logs))
