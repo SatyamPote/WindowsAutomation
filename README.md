@@ -2,7 +2,7 @@
 
 <img width="500" height="500" alt="Lotus Logo" src="https://github.com/user-attachments/assets/47150caa-e1dc-4cf7-a351-f06af310194a" />
 
-# 🪷 Lotus
+# 🪷 Lotus: The Ghost Update
 
 ### AI-Powered Windows Control Agent
 
@@ -10,13 +10,20 @@
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://python.org)
 [![Platform](https://img.shields.io/badge/platform-Windows%207--11-blue)](https://github.com)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram&logoColor=white)](https://core.telegram.org/bots)
-[![MCP](https://img.shields.io/badge/MCP-Lotus-8A2BE2)](https://github.com/SatyamPote/Lotus)
 
-**Control your entire Windows PC remotely through Telegram — powered by AI.**
+**Control your entire Windows PC remotely through Telegram — now with Ghost Transparency & Contact Engine.**
 
-[Features](#-features) · [Installation](#-installation) · [Commands](#-telegram-bot-commands) · [Music Player](#-music-player) · [MCP Tools](#-mcp-tools-reference)
+[Features](#-features) · [Installation](#-installation) · [Commands](#-telegram-bot-commands) · [Security](#-security)
 
 </div>
+
+---
+
+### 🌟 Featured Release
+*   **Ghost UI:** A 100% transparent control panel that floats elegantly on your desktop.
+*   **WhatsApp Contact Engine:** Save contacts with `/add` and message them by name.
+*   **Smart Power Management:** Remote `shutdown`, `restart`, and `sleep` with safety confirmations.
+*   **Persistent Background Service:** Silent, high-performance execution from the moment you boot.
 
 ---
 
