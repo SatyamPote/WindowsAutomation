@@ -1416,14 +1416,23 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def _load_config_token() -> str | None:
     """Load bot token from config.json if it exists."""
+    import sys as _sys
+    # Check app directory first (where installer puts it), then ProgramData
+    candidates = []
+    if getattr(_sys, 'frozen', False):
+        candidates.append(os.path.join(os.path.dirname(_sys.executable), "config.json"))
+    candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config.json"))
     PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
-    config_path = os.path.join(PROGRAM_DATA, "Lotus", "config", "config.json")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r') as f:
-                return json.load(f).get("bot_token")
-        except Exception:
-            pass
+    candidates.append(os.path.join(PROGRAM_DATA, "Lotus", "config", "config.json"))
+    for config_path in candidates:
+        config_path = os.path.normpath(config_path)
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    cfg = json.load(f)
+                return cfg.get("telegram_token") or cfg.get("bot_token")
+            except Exception:
+                pass
     return None
 
 def run_bot(token: str = None) -> None:
@@ -1446,17 +1455,25 @@ def run_bot(token: str = None) -> None:
         raise SystemExit("TELEGRAM_BOT_TOKEN not set. Run Lotus app or set env var.")
     
     # Also load allowed user IDs from config if present
+    import sys as _sys
+    config_candidates = []
+    if getattr(_sys, 'frozen', False):
+        config_candidates.append(os.path.join(os.path.dirname(_sys.executable), "config.json"))
+    config_candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config.json"))
     PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
-    config_path = os.path.join(PROGRAM_DATA, "Lotus", "config", "config.json")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r') as f:
-                cfg = json.load(f)
-            allowed = cfg.get("allowed_user_ids", "")
-            if allowed and not os.getenv("TELEGRAM_ALLOWED_USER_IDS"):
-                os.environ["TELEGRAM_ALLOWED_USER_IDS"] = allowed
-        except Exception:
-            pass
+    config_candidates.append(os.path.join(PROGRAM_DATA, "Lotus", "config", "config.json"))
+    for cp in config_candidates:
+        cp = os.path.normpath(cp)
+        if os.path.exists(cp):
+            try:
+                with open(cp, 'r') as f:
+                    cfg = json.load(f)
+                allowed = cfg.get("allowed_user_id") or cfg.get("allowed_user_ids", "")
+                if allowed and not os.getenv("TELEGRAM_ALLOWED_USER_IDS"):
+                    os.environ["TELEGRAM_ALLOWED_USER_IDS"] = str(allowed)
+                break
+            except Exception:
+                pass
 
     from telegram.request import HTTPXRequest
     request = HTTPXRequest(read_timeout=300, write_timeout=300, connect_timeout=300)
