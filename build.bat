@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 chcp 65001 > nul
 title Lotus Build System
 
@@ -9,6 +10,11 @@ echo ============================================
 echo.
 
 echo [1/4] Installing dependencies...
+python -m pip --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo      Pip not found. Installing pip via ensurepip...
+    python -m ensurepip --upgrade
+)
 python -m pip install pyinstaller --quiet
 python -m pip install -r requirements.txt --quiet
 echo      Done.
@@ -26,6 +32,10 @@ python -m PyInstaller ^
   --icon=assets\lotus_icon.ico ^
   --name=Lotus ^
   --add-data "assets;assets" ^
+  --add-data "Windows-MCP;Windows-MCP" ^
+  --paths "Windows-MCP\src" ^
+  --hidden-import=windows_mcp.telegram_bot ^
+  --hidden-import=dotenv ^
   --hidden-import=pystray ^
   --hidden-import=PIL._tkinter_finder ^
   --hidden-import=customtkinter ^

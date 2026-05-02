@@ -264,7 +264,7 @@ class LotusApp(ctk.CTk):
         _log.info("=== Lotus app started ===")
 
         self.title("Lotus")
-        self.geometry("400x660")
+        self.geometry("400x780")
         self.resizable(False, False)
         self.configure(fg_color="#1a1a1a") # Fallback color
 
@@ -281,6 +281,8 @@ class LotusApp(ctk.CTk):
 
         self.config       = load_config()
         self._status_poll = None  # for after() polling
+        self._log_poll    = None
+        self._last_log_size = 0
 
         # Try to set icon
         icon_path = os.path.join(APP_DIR, "assets", "lotus_icon.ico")
@@ -417,7 +419,10 @@ class LotusApp(ctk.CTk):
         self.clear_window()
         name = self.config.get("user_name", "User")
 
-        frame = ctk.CTkFrame(self.bg_label, fg_color="transparent", corner_radius=0)
+        frame = ctk.CTkScrollableFrame(
+            self.bg_label, fg_color="transparent", corner_radius=0,
+            scrollbar_button_color=BORDER, scrollbar_button_hover_color=TEXT_SECONDARY
+        )
         frame.pack(fill="both", expand=True, padx=40, pady=30)
 
         # Header
@@ -579,10 +584,33 @@ class LotusApp(ctk.CTk):
 
         # ── Check bot status and auto-start if not running ──
         self._poll_bot_status()
+        self._poll_bot_logs()
 
     # ──────────────────────────────────────────────
     # BOT CONTROL (PID-based, independent process)
     # ──────────────────────────────────────────────
+    def _poll_bot_logs(self):
+        """Continuously stream bot_service.log into the UI log box."""
+        try:
+            bot_log_path = os.path.join(PROGRAM_DATA, "Lotus", "logs", "bot_service.log")
+            if os.path.exists(bot_log_path):
+                current_size = os.path.getsize(bot_log_path)
+                if current_size > self._last_log_size:
+                    with open(bot_log_path, "r", encoding="utf-8", errors="ignore") as f:
+                        f.seek(self._last_log_size)
+                        new_text = f.read()
+                    self._last_log_size = current_size
+                    if new_text and hasattr(self, 'log_box'):
+                        self.log_box.configure(state="normal")
+                        self.log_box.insert("end", new_text)
+                        self.log_box.see("end")
+                        self.log_box.configure(state="disabled")
+                elif current_size < self._last_log_size:
+                    self._last_log_size = 0
+        except Exception:
+            pass
+        self._log_poll = self.after(1000, self._poll_bot_logs)
+
     def _poll_bot_status(self):
         """Periodically check if the bot service is alive and update UI."""
         alive = _is_bot_alive()
@@ -692,6 +720,9 @@ class LotusApp(ctk.CTk):
         if hasattr(self, '_status_poll') and self._status_poll:
             self.after_cancel(self._status_poll)
             self._status_poll = None
+        if hasattr(self, '_log_poll') and self._log_poll:
+            self.after_cancel(self._log_poll)
+            self._log_poll = None
         
         # Destroy everything EXCEPT the background label itself
         for widget in self.winfo_children():
