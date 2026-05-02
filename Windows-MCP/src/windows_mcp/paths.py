@@ -92,3 +92,60 @@ def _find_standard_claude_dir() -> Path | None:
 
     candidate = Path(appdata) / "Claude"
     return candidate if candidate.is_dir() else None
+
+
+def get_lotus_bin_dir() -> Path:
+    """Find the Lotus 'bin' directory containing mpv, yt-dlp, ffmpeg."""
+    import sys
+
+    # All candidate locations, checked in order
+    candidates = []
+
+    # 1. Frozen exe (PyInstaller) — check next to the .exe first
+    if getattr(sys, 'frozen', False):
+        candidates.append(Path(sys.executable).parent / "bin")
+
+    # 2. Relative to this source file (src/windows_mcp/ → up to Lotus/)
+    # This is primary for development environments
+    src_root = Path(__file__).resolve().parent.parent.parent  # Windows-MCP
+    candidates.append(src_root / "bin")
+    candidates.append(src_root.parent / "bin")  # Lotus project root
+
+    # 3. Search upward from this file for any ancestor with bin/
+    curr = Path(__file__).resolve().parent
+    for _ in range(10):
+        candidates.append(curr / "bin")
+        if curr.parent == curr:
+            break
+        curr = curr.parent
+
+    # 4. Standard install paths (Inno Setup default)
+    candidates.append(Path(r"C:\Program Files (x86)\Lotus\bin"))
+    candidates.append(Path(r"C:\Program Files\Lotus\bin"))
+
+    # 5. ProgramData (fallback)
+    program_data = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    candidates.append(Path(program_data) / "Lotus" / "bin")
+
+    # Return the first candidate that actually exists on disk AND has the tools
+    # We keep track of the first directory that actually exists as a fallback
+    fallback_dir = None
+
+    for p in candidates:
+        if p.is_dir():
+            if fallback_dir is None:
+                fallback_dir = p
+            
+            # Check for mpv.exe (root or subfolder) AND yt-dlp.exe
+            has_mpv = (p / "mpv.exe").exists() or (p / "mpv" / "mpv.exe").exists()
+            has_ytdlp = (p / "yt-dlp.exe").exists()
+            
+            if has_mpv and has_ytdlp:
+                return p
+
+    # If we found a directory that exists but doesn't have both, return it as a fallback
+    if fallback_dir:
+        return fallback_dir
+
+    # Absolute fallback — return the standard install path
+    return Path(r"C:\Program Files (x86)\Lotus\bin")

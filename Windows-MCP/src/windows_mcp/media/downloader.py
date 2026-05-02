@@ -20,6 +20,7 @@ import time
 import urllib.request
 import urllib.parse
 import json
+from windows_mcp.paths import get_lotus_bin_dir
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +41,10 @@ def _find_ytdlp() -> str | None:
     path = shutil.which("yt-dlp")
     if path:
         return path
-    project_root = os.path.abspath(os.path.join(_THIS_DIR, "..", "..", ".."))
-    local = os.path.join(project_root, "bin", "yt-dlp.exe")
-    if os.path.exists(local):
-        return local
+    bin_dir = get_lotus_bin_dir()
+    local = bin_dir / "yt-dlp.exe"
+    if local.exists():
+        return str(local)
     return None
 
 

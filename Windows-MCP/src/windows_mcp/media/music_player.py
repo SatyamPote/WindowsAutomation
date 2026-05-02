@@ -14,6 +14,7 @@ import subprocess
 import logging
 import sys
 import time
+from windows_mcp.paths import get_lotus_bin_dir
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +36,18 @@ class MusicPlayer:
         self.mpv_path = shutil.which("mpv")
         self.ytdlp_path = shutil.which("yt-dlp")
 
-        project_root = os.path.abspath(os.path.join(_THIS_DIR, "..", "..", ".."))
-        bin_dir = os.path.join(project_root, "bin")
+        bin_dir = get_lotus_bin_dir()
 
         if not self.mpv_path:
-            local_mpv = os.path.join(bin_dir, "mpv.exe")
-            if os.path.exists(local_mpv):
-                self.mpv_path = local_mpv
+            # Check both bin/mpv.exe and bin/mpv/mpv.exe (installer uses subfolder)
+            candidates = [
+                os.path.join(bin_dir, "mpv.exe"),
+                os.path.join(bin_dir, "mpv", "mpv.exe")
+            ]
+            for cand in candidates:
+                if os.path.exists(cand):
+                    self.mpv_path = cand
+                    break
 
         if not self.ytdlp_path:
             local_ytdlp = os.path.join(bin_dir, "yt-dlp.exe")
@@ -136,17 +142,26 @@ class MusicPlayer:
                 python_exe = shutil.which("python") or shutil.which("python3") or "python"
 
         try:
+            # Determine command based on whether we are frozen or not
+            if getattr(sys, 'frozen', False):
+                # When frozen, we call Lotus.exe with --player-tui flag
+                cmd = [sys.executable, "--player-tui"]
+            else:
+                # When running from source, we use python.exe to run player_tui.py
+                cmd = [python_exe, _TUI_SCRIPT]
+
+            cmd.extend([
+                "--query", query,
+                "--mpv", self.mpv_path,
+                "--ytdlp", self.ytdlp_path,
+                "--control", self._control_file,
+                "--status", self._status_file,
+            ])
+
             # CREATE_NEW_CONSOLE opens a VISIBLE new window AND lets us
             # keep the process handle so we can kill it later with stop.
             self.process = subprocess.Popen(
-                [
-                    python_exe, _TUI_SCRIPT,
-                    "--query", query,
-                    "--mpv", self.mpv_path,
-                    "--ytdlp", self.ytdlp_path,
-                    "--control", self._control_file,
-                    "--status", self._status_file,
-                ],
+                cmd,
                 cwd=_THIS_DIR,
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
             )

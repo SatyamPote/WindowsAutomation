@@ -1,0 +1,14 @@
+Lotus Installer - Completed Task List
+
+1. Build a fully autonomous Windows installer (LotusSetup.exe) using Inno Setup that installs Python, Ollama, FFmpeg, mpv, yt-dlp, and AI models from scratch.
+2. Build a custom Installer UI with a scrolling live log window to show real-time terminal outputs.
+3. Replace the standard Windows progress bar with a custom Pink progress bar.
+4. Add a dedicated AI Model Selection page (Fast, Balanced, Smart, or Skip).
+5. Modify the configuration page to ask for "Your Name" instead of "Bot Name", along with Telegram Bot Token and Allowed User ID.
+6. Fix the installer so it generates the required 'config.json' file properly instead of a '.env' file so the bot can connect to Telegram.
+7. Integrate the custom sidebar graphic (wizard_image.bmp) and corner icon (wizard_small.bmp) into the installer UI.
+8. Change the installer text to state "Version Beta" instead of "v2" or "2.0".
+9. Ensure that the Ollama model downloading process (and pip installations) live-streams its raw console output into the installer UI instead of running silently.
+10. Ensure the installer explicitly waits for the AI model to finish downloading to the default Ollama directory before moving on.
+11. Add a final Installation Summary popup at the end of the installation detailing exactly what succeeded and what failed.
+12. Automatically add the Lotus application to Windows Startup upon completion.

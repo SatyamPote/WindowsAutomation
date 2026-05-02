@@ -450,10 +450,39 @@ def _chat_reply(text: str) -> str | None:
             if 'date' in pattern:
                 return f"Today is {time.strftime('%B %d, %Y')}"
             return response
-    # Detect questions
-    if t.endswith('?') or t.startswith(('what', 'how', 'why', 'when', 'where', 'who', 'can you', 'do you')):
-        return "I'm a Windows automation bot. I can execute commands but can't answer general questions. Try /help to see what I can do!"
-    return None
+    # ── FINAL FALLBACK: Local Ollama AI ──
+    return _ollama_chat(text)
+
+def _ollama_chat(text: str) -> str | None:
+    """Fallback to local Ollama AI for real conversation."""
+    try:
+        import requests
+        # We try to find the model name from config or default to phi3
+        PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
+        config_path = os.path.join(PROGRAM_DATA, "Lotus", "config", "config.json")
+        model_name = "phi3" # Default
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    model_name = json.load(f).get("model_name", "phi3")
+            except: pass
+        
+        # Call Ollama API
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": model_name,
+                "prompt": f"You are Lotus, a helpful Windows AI assistant. Keep your response brief and friendly. User says: {text}",
+                "stream": False
+            },
+            timeout=15
+        )
+        if response.status_code == 200:
+            return response.json().get("response")
+    except Exception as e:
+        logger.debug(f"Ollama chat fallback failed: {e}")
+    
+    return "I'm a Windows automation bot. I can execute commands but can't answer general questions. Try /help to see what I can do!"
 
 def find_file(query: str) -> list[str]:
     """
@@ -793,24 +822,24 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
         return res
 
     # ── PRIORITY 3: Messaging (WhatsApp) ──
-        # WhatsApp Contact Management
-        if t.startswith("add contact"):
-            rest = t[11:].strip()
-            if ":" in rest:
-                name, phone = rest.split(":", 1)
-                res = add_contact(name.strip(), phone.strip())
-                return {"success": True, "message": res}
-            return {"success": False, "message": "Usage: `add contact Name : Number`"}
+    # WhatsApp Contact Management
+    if t.startswith("add contact"):
+        rest = t[11:].strip()
+        if ":" in rest:
+            name, phone = rest.split(":", 1)
+            res = add_contact(name.strip(), phone.strip())
+            return {"success": True, "message": res}
+        return {"success": False, "message": "Usage: `add contact Name : Number`"}
 
-        if t in ["my contacts", "show contacts", "view contacts", "list contacts"]:
-            return {"success": True, "message": format_contacts()}
+    if t in ["my contacts", "show contacts", "view contacts", "list contacts"]:
+        return {"success": True, "message": format_contacts()}
 
-        # WhatsApp Messaging
-        send_match = re.search(r'^send\s+(.+?)\s+to\s+(.+?)$', t)
-        if send_match:
-            payload, name = send_match.group(1).strip(), send_match.group(2).strip()
-            contact = get_contact(name)
-            if contact: return send_message(contact['phone'], payload, is_file=os.path.isfile(payload))
+    # WhatsApp Messaging
+    send_match = re.search(r'^send\s+(.+?)\s+to\s+(.+?)$', t)
+    if send_match:
+        payload, name = send_match.group(1).strip(), send_match.group(2).strip()
+        contact = get_contact(name)
+        if contact: return send_message(contact['phone'], payload, is_file=os.path.isfile(payload))
 
     # ── PRIORITY 4: File Operations (open / find) ──
     file_extensions = ('.pdf', '.txt', '.docx', '.xlsx', '.png', '.jpg', '.mp3', '.mp4')
@@ -1047,26 +1076,19 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     help_text = (
         f"🌸 *Welcome to Lotus, {name}!* 👋\n"
         "Your Personal Windows AI Control System.\n\n"
-        "📁 *File & Folders*\n"
-        "• `ls` / `cd` — Navigate PC\n"
-        "• `find <file>` — Locate files\n"
-        "• `send <file>` — Get file from PC\n\n"
-        "🎵 *Media & Downloads*\n"
-        "• `play <song>` — Play on PC\n"
-        "• `download youtube <url>` — Save videos\n"
-        "• `download images <topic>` — Bulk save\n\n"
-        "💬 *WhatsApp*\n"
-        "• `/add <name> : <number>` — Save contact\n"
-        "• `/contacts` — View saved list\n"
-        "• `send <msg> to <name>` — Send WhatsApp\n\n"
-        "🖥️ *System*\n"
-        "• `screenshot` — View desktop\n"
-        "• `lock` / `sleep` / `shutdown`\n"
-        "• `dashboard` — System stats\n\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "💡 *Tip:* You can type naturally, e.g., 'hey lotus please play some lo-fi music'."
+        "Explore my capabilities using the buttons below or type naturally (e.g., 'play some music')."
     )
-    await update.message.reply_text(help_text, parse_mode="Markdown")
+    buttons = [
+        [InlineKeyboardButton("📁 Files", callback_data="files"),
+         InlineKeyboardButton("🎵 Media", callback_data="media")],
+        [InlineKeyboardButton("🖥️ System", callback_data="system"),
+         InlineKeyboardButton("📥 Downloads", callback_data="downloads")],
+        [InlineKeyboardButton("💬 WhatsApp", callback_data="whatsapp"),
+         InlineKeyboardButton("📷 Tools", callback_data="tools")],
+        [InlineKeyboardButton("📊 Status", callback_data="status"),
+         InlineKeyboardButton("❓ Help", callback_data="help")]
+    ]
+    await update.message.reply_text(help_text, reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown")
 
 @require_auth
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
