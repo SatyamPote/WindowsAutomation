@@ -702,20 +702,28 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
                     resp = "🔍 *Found matches:*\n" + "\n".join([f"{i+1}. `{os.path.basename(m)}`" for i, m in enumerate(matches[:5])])
                     return {"success": True, "message": resp}
 
-    # ── 3. MUSIC COMMANDS ──
-    music_keywords = ["play", "pause", "resume", "stop", "next", "prev", "previous", "volume"]
-    if first_word in music_keywords or t in music_keywords:
-        if first_word == "play":
-            query = t[4:].strip()
-            if query: return music_player.play_song(query)
-        
-        music_map = {
-            "pause": music_player.pause, "resume": music_player.resume, "stop": music_player.stop,
-            "next": music_player.next_song, "prev": music_player.previous_song, "previous": music_player.previous_song,
-            "volume up": music_player.volume_up, "volume down": music_player.volume_down
-        }
-        if t in music_map: return music_map[t]()
-        if first_word in music_map: return music_map[first_word]()
+    # ── 3. MUSIC & PLAYLIST COMMANDS ──
+    # Regex for complex playlist commands
+    create_pl = re.match(r'^create playlist\s+(.+)$', t)
+    delete_pl = re.match(r'^delete playlist\s+(.+)$', t)
+    add_pl = re.match(r'^add to playlist\s+(\w+)\s+(.+)$', t)
+    play_pl = re.match(r'^play playlist\s+(.+)$', t)
+    vol_cmd = re.match(r'^volume\s+(\d+)$', t)
+
+    if first_word == "play" and not play_pl:
+        query = t[4:].strip()
+        if not query: return {"success": False, "message": "❓ Play what?"}
+        return music_player.play_song(query)
+
+    if t == "stop": return music_player.stop()
+    if t in ["pause", "resume"]: return music_player.pause_resume()
+    if t == "next": return music_player.next_song()
+    
+    if vol_cmd: return music_player.set_volume(vol_cmd.group(1))
+    if create_pl: return music_player.create_playlist(create_pl.group(1).strip())
+    if delete_pl: return music_player.delete_playlist(delete_pl.group(1).strip())
+    if add_pl: return music_player.add_to_playlist(add_pl.group(1), add_pl.group(2))
+    if play_pl: return music_player.play_playlist(play_pl.group(1).strip())
 
     # ── 4. RESEARCH / DOWNLOAD ──
     if first_word == "research":

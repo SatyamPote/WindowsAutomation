@@ -15,11 +15,12 @@ The Research Engine is now more powerful than ever, featuring a multi-source fal
 - **Professional Reports**: Automatically generates high-quality PDF reports with summaries, key findings, and references.
 - **Resilient Image Scraping**: Improved image scraper with relative URL resolution ensures you get visual context for every topic.
 
-### 🎵 Stable Music Playback
-We've resolved the "ghost player" issues and playback crashes.
-- **Single Instance Control**: Aggressive process management ensures only one player window is active at any time.
-- **Full Control**: Working `next`, `prev`, `volume`, and `stop` commands via Telegram.
-- **visible TUI**: Desktop player window remains visible for local monitoring while being remotely controlled.
+### 🎵 Minimal Stable Music System (v2.2.0)
+We've removed all complex TUI and playlist logic to prioritize **100% reliability**.
+- **Instant Playback**: Direct integration with `mpv` and YouTube search.
+- **Aggressive Cleanup**: Intelligent `taskkill` ensures zero ghost processes or overlapping audio.
+- **Simplified Controls**: Focus on `play`, `stop`, and `pause` for a crash-free experience.
+- **Single Response UI**: Clean, framed Telegram replies with no bot chatter.
 
 ### 🗣️ Sweet Voice & Standardized UI
 - **Female Voice Feedback**: All assistant responses are delivered in a sweet, professional female tone.

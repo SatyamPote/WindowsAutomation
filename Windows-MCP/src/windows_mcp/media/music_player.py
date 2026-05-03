@@ -1,236 +1,202 @@
 """
-Lotus Music Player — Controller
-==================================
-Opens a visible terminal window with a TUI music player.
-Uses mpv + yt-dlp to search YouTube and stream audio.
-
-Communication between Telegram bot and the TUI window
-is done via control/status files.
+Lotus Media & Playlist System
+==============================
+Stable, dictionary-based player state.
+Supports direct playback and playlist management.
 """
 
 import os
-import shutil
+import json
 import subprocess
+import shutil
 import logging
-import sys
+import threading
 import time
-from windows_mcp.paths import get_lotus_bin_dir
 
 logger = logging.getLogger(__name__)
 
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_TUI_SCRIPT = os.path.join(_THIS_DIR, "player_tui.py")
-
+# Paths
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+PLAYLIST_FILE = os.path.join(DATA_DIR, "playlists.json")
 
 class MusicPlayer:
     def __init__(self):
-        self.process = None       # the TUI python process (CREATE_NEW_CONSOLE)
-        self._query = ""
-        self._control_file = os.path.join(_THIS_DIR, ".player_control")
-        self._status_file = os.path.join(_THIS_DIR, ".player_status")
-        # Ensure state is always a dict to prevent 'tuple' attribute errors
-        self.state = {
+        os.makedirs(DATA_DIR, exist_ok=True)
+        self.player = {
             "process": None,
-            "queue": [],
-            "index": 0
+            "current_song": None,
+            "playlist": [],
+            "index": 0,
+            "paused": False,
+            "volume": 100
         }
+        self._load_playlists()
+        self._monitor_thread = None
+        self._monitoring = False
 
-    # ------------------------------------------------------------------
-    # Dependency check
-    # ------------------------------------------------------------------
-    def check_dependencies(self):
-        self.mpv_path = shutil.which("mpv")
-        self.ytdlp_path = shutil.which("yt-dlp")
-
-        bin_dir = get_lotus_bin_dir()
-
-        if not self.mpv_path:
-            candidates = [
-                os.path.join(bin_dir, "mpv.exe"),
-                os.path.join(bin_dir, "mpv", "mpv.exe")
-            ]
-            for cand in candidates:
-                if os.path.exists(cand):
-                    self.mpv_path = cand
-                    break
-
-        if not self.ytdlp_path:
-            local_ytdlp = os.path.join(bin_dir, "yt-dlp.exe")
-            if os.path.exists(local_ytdlp):
-                self.ytdlp_path = local_ytdlp
-
-        return self.mpv_path is not None and self.ytdlp_path is not None
-
-    # ------------------------------------------------------------------
-    # Control helpers
-    # ------------------------------------------------------------------
-    def _send_control(self, command: str):
-        try:
-            with open(self._control_file, "w", encoding="utf-8") as f:
-                f.write(command)
-        except Exception as e:
-            logger.error("Failed to write control command: %s", e)
-
-    def _is_tui_running(self) -> bool:
-        if self.process is not None and self.process.poll() is None:
-            return True
-        return False
-
-    def _cleanup_files(self):
-        for f in [self._control_file, self._status_file]:
+    def _load_playlists(self):
+        if os.path.exists(PLAYLIST_FILE):
             try:
-                if os.path.exists(f):
-                    os.remove(f)
-            except Exception:
-                pass
+                with open(PLAYLIST_FILE, "r") as f:
+                    self.playlists = json.load(f)
+            except:
+                self.playlists = {}
+        else:
+            self.playlists = {}
 
-    def _kill_tui(self):
-        """Force-kill the TUI process and any orphaned TUI windows."""
-        import psutil
-        
-        # 0. Kill ALL mpv instances (Aggressive cleanup)
+    def _save_playlists(self):
+        with open(PLAYLIST_FILE, "w") as f:
+            json.dump(self.playlists, f, indent=2)
+
+    def _kill_mpv(self):
+        """Aggressive cleanup."""
         try:
+            if self.player["process"]:
+                self.player["process"].terminate()
+                self.player["process"] = None
             os.system("taskkill /IM mpv.exe /F >nul 2>&1")
-        except: pass
+        except:
+            pass
 
-        # 1. Kill the known process handle if it exists
-        if self.process is not None:
-            pid = self.process.pid
-            try:
-                parent = psutil.Process(pid)
-                for child in parent.children(recursive=True):
-                    try:
-                        child.kill()
-                    except Exception:
-                        pass
-                parent.kill()
-                parent.wait(timeout=2)
-            except Exception:
-                pass
-        
-        # 2. Aggressive Fallback: Scan all processes for 'player_tui.py'
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-            try:
-                cmdline = proc.info.get('cmdline') or []
-                if any('player_tui.py' in part for part in cmdline):
-                    logger.info("Killing orphaned TUI process: %d", proc.info['pid'])
-                    try:
-                        for child in proc.children(recursive=True):
-                            child.kill()
-                    except Exception:
-                        pass
-                    proc.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                continue
-
-        self.process = None
-        self.state["process"] = None
-
-    # ------------------------------------------------------------------
-    # Playback
-    # ------------------------------------------------------------------
-    def play_song(self, query: str):
-        if not self.check_dependencies():
-            return {"success": False, "message": "❌ mpv or yt-dlp missing in bin/ folder."}
-
-        # Stop any existing playback
-        self.stop()
-        self._query = query
-
-        # Clear old files
-        self._cleanup_files()
-
-        python_exe = sys.executable
-        if "pythonw" in python_exe.lower():
-            python_exe = python_exe.lower().replace("pythonw.exe", "python.exe")
-            if not os.path.exists(python_exe):
-                python_exe = shutil.which("python") or shutil.which("python3") or "python"
+    def _play_internal(self, song_query):
+        """Direct mpv launch."""
+        mpv_path = shutil.which("mpv")
+        if not mpv_path:
+            return False, "❌ mpv not found."
 
         try:
-            system_python = shutil.which("python") or shutil.which("python3") or "python"
-            
-            if getattr(sys, 'frozen', False):
-                cmd = [system_python, _TUI_SCRIPT]
-            else:
-                cmd = [python_exe, _TUI_SCRIPT]
-
-            cmd.extend([
-                "--query", query,
-                "--mpv", self.mpv_path,
-                "--ytdlp", self.ytdlp_path,
-                "--control", self._control_file,
-                "--status", self._status_file,
-            ])
-
-            si = subprocess.STARTUPINFO()
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 1 # SW_NORMAL
-            
-            self.process = subprocess.Popen(
+            cmd = [
+                mpv_path, 
+                "--no-video", 
+                f"--volume={self.player['volume']}",
+                f"ytdl://ytsearch:{song_query}"
+            ]
+            self.player["process"] = subprocess.Popen(
                 cmd,
-                cwd=_THIS_DIR,
-                creationflags=subprocess.CREATE_NEW_CONSOLE,
-                startupinfo=si,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW
             )
-            self.state["process"] = self.process
-            logger.info("Launched TUI player (PID %d) for: %s", self.process.pid, query)
-
-            return {"success": True, "message": f"🎵 **Playing:** {query}\nDesktop player window opened."}
-
+            self.player["current_song"] = song_query
+            self.player["paused"] = False
+            
+            # Start monitoring if not already
+            if not self._monitoring:
+                self._start_monitor()
+                
+            return True, f"🎵 Now playing: {song_query}"
         except Exception as e:
-            logger.error("Failed to launch TUI player: %s", e)
-            return {"success": False, "message": f"❌ Failed to open music player: {e}"}
+            return False, f"❌ Error: {str(e)}"
 
-    def pause(self):
-        if self._is_tui_running():
-            self._send_control("pause")
-            return {"success": True, "message": "⏸ Music paused."}
-        return {"success": False, "message": "⚠️ No music playing."}
+    def _start_monitor(self):
+        self._monitoring = True
+        self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self._monitor_thread.start()
 
-    def resume(self):
-        if self._is_tui_running():
-            self._send_control("resume")
-            return {"success": True, "message": "▶️ Resumed."}
-        return {"success": False, "message": "⚠️ No music playing."}
+    def _monitor_loop(self):
+        while self._monitoring:
+            if self.player["process"] and self.player["process"].poll() is not None:
+                # Process ended
+                if self.player["playlist"] and self.player["index"] < len(self.player["playlist"]) - 1:
+                    self.player["index"] += 1
+                    next_song = self.player["playlist"][self.player["index"]]
+                    logger.info(f"Auto-playing next: {next_song}")
+                    self._play_internal(next_song)
+                else:
+                    self.player["process"] = None
+                    self.player["current_song"] = None
+            time.sleep(2)
+
+    # ── PUBLIC COMMANDS ──
+
+    def play_song(self, query):
+        self._kill_mpv()
+        self.player["playlist"] = []
+        self.player["index"] = 0
+        success, msg = self._play_internal(query)
+        return {"success": success, "message": msg}
 
     def stop(self):
-        if self._is_tui_running():
-            self._send_control("quit")
+        self._kill_mpv()
+        self.player["playlist"] = []
+        self.player["current_song"] = None
+        return {"success": True, "message": "⏹️ Music stopped"}
+
+    def pause_resume(self):
+        if self.player["process"]:
             try:
-                self.process.wait(timeout=2)
-            except Exception:
+                self.player["process"].stdin.write(b"p")
+                self.player["process"].stdin.flush()
+                self.player["paused"] = not self.player["paused"]
+                state = "Paused" if self.player["paused"] else "Resumed"
+                return {"success": True, "message": f"⏯️ {state}"}
+            except:
                 pass
-
-        self._kill_tui()
-        self.process = None
-        self.state["process"] = None
-        self._query = ""
-        self._cleanup_files()
-        return {"success": True, "message": "⏹ Music stopped. Player closed."}
-
-    def volume_up(self):
-        if self._is_tui_running():
-            self._send_control("volume_up")
-            return {"success": True, "message": "🔊 Volume up."}
-        return {"success": False, "message": "⚠️ No music playing."}
-
-    def volume_down(self):
-        if self._is_tui_running():
-            self._send_control("volume_down")
-            return {"success": True, "message": "🔉 Volume down."}
         return {"success": False, "message": "⚠️ No music playing."}
 
     def next_song(self):
-        if self._is_tui_running():
-            self._send_control("next")
-            return {"success": True, "message": "⏭ Skipped to next track."}
-        return {"success": False, "message": "⚠️ No music playing."}
+        if self.player["playlist"] and self.player["index"] < len(self.player["playlist"]) - 1:
+            self._kill_mpv()
+            self.player["index"] += 1
+            song = self.player["playlist"][self.player["index"]]
+            success, _ = self._play_internal(song)
+            return {"success": success, "message": f"▶ Next: {song}"}
+        return {"success": False, "message": "⚠️ End of playlist."}
 
-    def previous_song(self):
-        if self._is_tui_running():
-            self._send_control("prev")
-            return {"success": True, "message": "⏮ Skipped to previous track."}
-        return {"success": False, "message": "⚠️ No music playing."}
+    def set_volume(self, level):
+        try:
+            vol = int(level)
+            vol = max(0, min(100, vol))
+            self.player["volume"] = vol
+            if self.player["process"]:
+                # mpv volume command via stdin (harder without IPC, easier to just send 0/9 keys multiple times or restart)
+                # But we can restart with new volume for simplicity, or use 'set volume X' if mpv supports it via stdin
+                try:
+                    self.player["process"].stdin.write(f"set volume {vol}\n".encode())
+                    self.player["process"].stdin.flush()
+                except:
+                    pass
+            return {"success": True, "message": f"🔊 Volume set to {vol}%"}
+        except:
+            return {"success": False, "message": "❌ Invalid volume level."}
 
+    # ── PLAYLIST MGMT ──
 
+    def create_playlist(self, name):
+        if name in self.playlists:
+            return {"success": False, "message": f"❌ Playlist '{name}' already exists."}
+        self.playlists[name] = []
+        self._save_playlists()
+        return {"success": True, "message": f"✅ Created playlist: {name}"}
+
+    def delete_playlist(self, name):
+        if name in self.playlists:
+            del self.playlists[name]
+            self._save_playlists()
+            return {"success": True, "message": f"🗑️ Deleted playlist: {name}"}
+        return {"success": False, "message": "❌ Playlist not found."}
+
+    def add_to_playlist(self, name, song):
+        if name not in self.playlists:
+            return {"success": False, "message": f"❌ Playlist '{name}' not found."}
+        self.playlists[name].append(song)
+        self._save_playlists()
+        return {"success": True, "message": f"✅ Added '{song}' to {name}"}
+
+    def play_playlist(self, name):
+        if name not in self.playlists or not self.playlists[name]:
+            return {"success": False, "message": "❌ Playlist not found or empty."}
+        
+        self._kill_mpv()
+        self.player["playlist"] = self.playlists[name]
+        self.player["index"] = 0
+        song = self.player["playlist"][0]
+        success, _ = self._play_internal(song)
+        if success:
+            return {"success": True, "message": f"🎵 Playlist: {name}\n▶ Playing: {song}"}
+        return {"success": False, "message": "❌ Failed to start playlist."}
+
+# Global instance
 player = MusicPlayer()
