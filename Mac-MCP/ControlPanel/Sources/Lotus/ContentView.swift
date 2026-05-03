@@ -5,8 +5,8 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if state.baseDirMissing {
-                BaseDirPickerView()
+            if !state.envReady {
+                InstallerView()
             } else if state.config == nil {
                 SetupView()
             } else {

@@ -7,7 +7,13 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "Lotus",
-            path: "Sources/Lotus"
+            path: "Sources/Lotus",
+            resources: [
+                .process("Resources/bot_service.py"),
+                .process("Resources/pyproject.toml"),
+                .process("Resources/uv.lock"),
+                .copy("Resources/src"),
+            ]
         )
     ]
 )

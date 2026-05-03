@@ -9,14 +9,37 @@ struct AppConfig: Codable, Sendable {
 
     // MARK: - Paths
 
-    /// Mac-MCP project root — found by walking up from the executable
-    /// until a directory containing bot_service.py is reached.
-    static let baseDir: URL = {
+    /// bot_service.py bundled inside the app; dev walk-up as fallback.
+    static var botScriptURL: URL {
+        if let url = Bundle.module.url(forResource: "bot_service", withExtension: "py") {
+            return url
+        }
+        return _devBaseDir.appendingPathComponent("bot_service.py")
+    }
+
+    /// Directory that contains bot_service.py — used as working directory for uv.
+    static var botScriptDir: URL {
+        botScriptURL.deletingLastPathComponent()
+    }
+
+    /// Assets directory for logo images.
+    static var assetsDir: URL? {
+        // Bundle (when app is packaged)
+        if let res = Bundle.module.resourceURL {
+            let dir = res.appendingPathComponent("assets")
+            if FileManager.default.fileExists(atPath: dir.path) { return dir }
+        }
+        // Dev fallback
+        let dir = _devBaseDir.appendingPathComponent("assets")
+        return FileManager.default.fileExists(atPath: dir.path) ? dir : nil
+    }
+
+    /// Development fallback: walk up from the executable until bot_service.py is found.
+    static let _devBaseDir: URL = {
         let fm = FileManager.default
         var dir = URL(fileURLWithPath: CommandLine.arguments[0])
             .resolvingSymlinksInPath()
             .deletingLastPathComponent()
-
         for _ in 0..<10 {
             if fm.fileExists(atPath: dir.appendingPathComponent("bot_service.py").path) {
                 return dir
@@ -25,21 +48,22 @@ struct AppConfig: Codable, Sendable {
             if parent.path == dir.path { break }
             dir = parent
         }
-
-        // Fallback: stored preference (set by SwiftUI setup wizard in Phase 3)
         if let stored = UserDefaults.standard.string(forKey: "com.lotus.basedir") {
             return URL(fileURLWithPath: stored)
         }
         return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     }()
 
-    static var configURL: URL {
-        baseDir.appendingPathComponent("config.json")
-    }
+    // MARK: - App data (writable)
 
     static var appDataDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Lotus")
+    }
+
+    /// Config is stored in the writable appDataDir, never inside the app bundle.
+    static var configURL: URL {
+        appDataDir.appendingPathComponent("config.json")
     }
 
     static var controlPortFile: URL {
@@ -62,11 +86,25 @@ struct AppConfig: Codable, Sendable {
     // MARK: - Persistence
 
     static func load() -> AppConfig? {
-        guard let data = try? Data(contentsOf: configURL) else { return nil }
-        return try? JSONDecoder().decode(AppConfig.self, from: data)
+        // Try canonical writable location first
+        if let data = try? Data(contentsOf: configURL),
+           let cfg  = try? JSONDecoder().decode(AppConfig.self, from: data) {
+            return cfg
+        }
+        // Migrate from legacy Mac-MCP/config.json (dev tree or old install)
+        let legacyURL = _devBaseDir.appendingPathComponent("config.json")
+        if legacyURL != configURL,
+           let data = try? Data(contentsOf: legacyURL),
+           let cfg  = try? JSONDecoder().decode(AppConfig.self, from: data) {
+            try? cfg.save()   // write to canonical path for next launch
+            return cfg
+        }
+        return nil
     }
 
     func save() throws {
+        try FileManager.default.createDirectory(
+            at: AppConfig.appDataDir, withIntermediateDirectories: true)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted]
         let data = try enc.encode(self)

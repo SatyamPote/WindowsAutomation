@@ -9,8 +9,9 @@ struct ControlPanelView: View {
     private var isRunning: Bool { state.serviceStatus?.running == true }
 
     private var logoURL: URL? {
+        guard let assets = AppConfig.assetsDir else { return nil }
         for n in ["lotus_logo.png", "logo_white.png", "logo.png"] {
-            let u = AppConfig.baseDir.appendingPathComponent("assets/\(n)")
+            let u = assets.appendingPathComponent(n)
             if FileManager.default.fileExists(atPath: u.path) { return u }
         }
         return nil

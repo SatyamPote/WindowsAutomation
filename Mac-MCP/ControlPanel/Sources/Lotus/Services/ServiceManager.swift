@@ -34,12 +34,11 @@ final class ServiceManager: Sendable {
 
     /// Write the launchd plist and bootstrap it for the current user session.
     func install(controlPort: Int = 40510) throws {
-        let baseDir = AppConfig.baseDir
+        let scriptDir = AppConfig.botScriptDir
         let logFile = AppConfig.botLogFile
         let plistURL = AppConfig.launchAgentPlist
 
-        // Resolve the Python runtime in priority order
-        let programArgs = resolveProgramArgs(baseDir: baseDir)
+        let programArgs = resolveProgramArgs()
         let argsXML = programArgs
             .map { "        <string>\($0.replacingOccurrences(of: "&", with: "&amp;"))</string>" }
             .joined(separator: "\n")
@@ -61,7 +60,7 @@ final class ServiceManager: Sendable {
     <key>KeepAlive</key>
     <false/>
     <key>WorkingDirectory</key>
-    <string>\(baseDir.path)</string>
+    <string>\(scriptDir.path)</string>
     <key>StandardOutPath</key>
     <string>\(logFile.path)</string>
     <key>StandardErrorPath</key>
@@ -164,11 +163,13 @@ final class ServiceManager: Sendable {
     }
 
     /// Build the ProgramArguments array for the plist, preferring uv.
-    private func resolveProgramArgs(baseDir: URL) -> [String] {
+    /// bot_service.py is resolved from the app bundle via AppConfig.botScriptURL.
+    private func resolveProgramArgs() -> [String] {
         let fm = FileManager.default
-        let botScript = baseDir.appendingPathComponent("bot_service.py").path
+        let botScript = AppConfig.botScriptURL.path
+        let scriptDir = AppConfig.botScriptDir
 
-        // 1. uv (respects the project's virtualenv)
+        // 1. uv run — finds pyproject.toml in the script's directory
         let uvCandidates = [
             "/opt/homebrew/bin/uv",
             "/usr/local/bin/uv",
@@ -179,8 +180,8 @@ final class ServiceManager: Sendable {
             return [uv, "run", "python", botScript]
         }
 
-        // 2. project .venv
-        let venvPython = baseDir.appendingPathComponent(".venv/bin/python").path
+        // 2. .venv alongside bot_service.py
+        let venvPython = scriptDir.appendingPathComponent(".venv/bin/python").path
         if fm.fileExists(atPath: venvPython) {
             return [venvPython, botScript]
         }

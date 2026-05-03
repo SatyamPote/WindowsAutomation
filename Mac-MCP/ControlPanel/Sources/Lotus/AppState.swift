@@ -7,10 +7,12 @@ final class AppState: ObservableObject {
     static let shared = AppState()
     private init() {
         config = AppConfig.load()
+        envReady = InstallManager.shared.envIsReady
     }
 
     // MARK: - Published state
 
+    @Published var envReady: Bool
     @Published var config: AppConfig?
     @Published var serviceStatus: ServiceStatus?
     @Published var logLines: [String] = []
@@ -20,15 +22,6 @@ final class AppState: ObservableObject {
     @Published var isStarting = false
     @Published var isStopping = false
     @Published var lastError: String?
-
-    // MARK: - Derived
-
-    /// True when baseDir cannot be found — triggers folder picker
-    var baseDirMissing: Bool {
-        !FileManager.default.fileExists(
-            atPath: AppConfig.baseDir.appendingPathComponent("bot_service.py").path
-        )
-    }
 
     // MARK: - Polling
 
@@ -142,6 +135,10 @@ final class AppState: ObservableObject {
 
     func reloadConfig() {
         config = AppConfig.load()
+    }
+
+    func markEnvReady() {
+        envReady = true
     }
 
     // MARK: - Startup toggle

@@ -13,8 +13,9 @@ struct SetupView: View {
     @State private var errorMsg = ""
 
     private var logoURL: URL? {
+        guard let assets = AppConfig.assetsDir else { return nil }
         for n in ["lotus_logo.png", "logo_white.png", "logo.png"] {
-            let u = AppConfig.baseDir.appendingPathComponent("assets/\(n)")
+            let u = assets.appendingPathComponent(n)
             if FileManager.default.fileExists(atPath: u.path) { return u }
         }
         return nil
@@ -22,78 +23,135 @@ struct SetupView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            VStack(spacing: 8) {
-                logoView
-                    .frame(width: 64, height: 64)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+            header
+            Divider()
+            ScrollView {
+                fields
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 20)
+            }
+            Divider()
+            actionBar
+        }
+        .frame(minWidth: 420, idealWidth: 460,
+               minHeight: 540, idealHeight: 600)
+        .onAppear(perform: populate)
+    }
 
-                Text("Lotus")
-                    .font(.title.bold())
+    // MARK: - Header
 
-                Text(editing ? "Update your settings below." : "Connect your Telegram bot to get started.")
-                    .font(.subheadline)
+    private var header: some View {
+        VStack(spacing: 6) {
+            logoView
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+
+            Text(editing ? "Settings" : "Lotus Setup")
+                .font(.title2.bold())
+
+            Text(editing
+                 ? "Edit your bot configuration below."
+                 : "Enter your Telegram credentials to get started.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 22)
+        .padding(.horizontal, 32)
+    }
+
+    // MARK: - Fields
+
+    private var fields: some View {
+        VStack(alignment: .leading, spacing: 20) {
+
+            // ── Telegram credentials ──────────────────────────────────────
+            sectionHeader("Telegram Credentials", icon: "paperplane.fill")
+
+            field(
+                label: "Bot Token",
+                hint: "Get yours from @BotFather on Telegram",
+                placeholder: "123456789:AABBccDD…",
+                text: $token,
+                isMonospaced: true,
+                isSecure: false
+            )
+
+            field(
+                label: "Allowed User IDs",
+                hint: "Comma-separated — find your ID with @userinfobot",
+                placeholder: "123456789, 987654321",
+                text: $userIDs
+            )
+
+            field(
+                label: "Your Name",
+                hint: "Used in bot greeting messages",
+                placeholder: "e.g. Jayash",
+                text: $name
+            )
+
+            Divider()
+
+            // ── AI model ──────────────────────────────────────────────────
+            sectionHeader("Ollama AI Model", icon: "cpu")
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Model")
+                    .font(.callout.weight(.medium))
+                OllamaModelPicker(selected: $model)
+                Text("Install Ollama, then run: ollama pull phi3")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 28)
-            .padding(.horizontal, 32)
+        }
+    }
 
-            Divider()
+    @ViewBuilder
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+    }
 
-            // Form
-            Form {
-                Section {
-                    LabeledContent("Bot Token") {
-                        TextField("123456:ABC-DEF…", text: $token)
-                            .textFieldStyle(.plain)
-                            .multilineTextAlignment(.trailing)
-                            .font(Theme.mono(12))
-                    }
-                    LabeledContent("Allowed User IDs") {
-                        TextField("123456789, 987654321", text: $userIDs)
-                            .textFieldStyle(.plain)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    LabeledContent("Your Name") {
-                        TextField("e.g. Jayash", text: $name)
-                            .textFieldStyle(.plain)
-                            .multilineTextAlignment(.trailing)
-                    }
-                } header: {
-                    Label("Telegram Credentials", systemImage: "message.fill")
-                } footer: {
-                    Text("Get a bot token from @BotFather on Telegram. Find your user ID with @userinfobot.")
-                }
+    @ViewBuilder
+    private func field(
+        label: String,
+        hint: String,
+        placeholder: String,
+        text: Binding<String>,
+        isMonospaced: Bool = false,
+        isSecure: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.callout.weight(.medium))
+            TextField(placeholder, text: text)
+                .textFieldStyle(.roundedBorder)
+                .font(isMonospaced ? Theme.mono(13) : .body)
+            Text(hint)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
 
-                Section {
-                    LabeledContent("AI Model") {
-                        OllamaModelPicker(selected: $model)
-                    }
-                } header: {
-                    Label("Ollama (AI Chat Fallback)", systemImage: "cpu")
-                } footer: {
-                    Text("Install Ollama via Homebrew, then run: ollama pull phi3")
-                }
-            }
-            .formStyle(.grouped)
-            .scrollDisabled(false)
+    // MARK: - Action bar
 
-            Divider()
-
-            // Error
+    private var actionBar: some View {
+        VStack(spacing: 0) {
             if !errorMsg.isEmpty {
                 Label(errorMsg, systemImage: "exclamationmark.triangle.fill")
                     .font(.callout)
                     .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 24)
                     .padding(.top, 12)
             }
 
-            // Actions
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 if editing {
                     Button("Cancel") { onDismiss?() }
                         .buttonStyle(.bordered)
@@ -115,17 +173,9 @@ struct SetupView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
-        .frame(minWidth: 400, idealWidth: 460, maxWidth: .infinity,
-               minHeight: 500, idealHeight: 600, maxHeight: .infinity)
-        .onAppear {
-            if let cfg = state.config {
-                token   = cfg.telegram_token
-                userIDs = cfg.allowed_user_id
-                name    = cfg.name
-                model   = cfg.model_name
-            }
-        }
     }
+
+    // MARK: - Logo
 
     @ViewBuilder
     private var logoView: some View {
@@ -133,20 +183,28 @@ struct SetupView: View {
             AsyncImage(url: url) { phase in
                 if let img = phase.image {
                     img.resizable().interpolation(.high).scaledToFill()
-                } else {
-                    placeholderLogo
-                }
+                } else { placeholder }
             }
         } else {
-            placeholderLogo
+            placeholder
         }
     }
 
-    private var placeholderLogo: some View {
+    private var placeholder: some View {
         ZStack {
             Color.accentColor.opacity(0.15)
-            Text("🌸").font(.system(size: 32))
+            Text("🌸").font(.system(size: 28))
         }
+    }
+
+    // MARK: - Logic
+
+    private func populate() {
+        guard let cfg = state.config else { return }
+        token   = cfg.telegram_token
+        userIDs = cfg.allowed_user_id
+        name    = cfg.name
+        model   = cfg.model_name
     }
 
     private func save() {
@@ -155,25 +213,22 @@ struct SetupView: View {
         let ids = userIDs.trimmingCharacters(in: .whitespaces)
         let m   = model.trimmingCharacters(in: .whitespaces)
 
-        guard !t.isEmpty else { errorMsg = "Bot Token is required.";  return }
-        guard !n.isEmpty else { errorMsg = "Your Name is required.";  return }
-        guard t.contains(":") else {
-            errorMsg = "Invalid token format — expected 123456:ABC…"
-            return
-        }
+        guard !t.isEmpty        else { errorMsg = "Bot Token is required."; return }
+        guard !n.isEmpty        else { errorMsg = "Your Name is required."; return }
+        guard t.contains(":")   else { errorMsg = "Invalid token — expected 123456:ABC…"; return }
         errorMsg = ""
 
         let ts: String = {
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm:ss"
             return f.string(from: Date())
         }()
+
         let cfg = AppConfig(
-            name: n,
-            telegram_token: t,
+            name:            n,
+            telegram_token:  t,
             allowed_user_id: ids,
-            model_name: m.isEmpty ? "phi3" : m,
-            created_at: ts
+            model_name:      m.isEmpty ? "phi3" : m,
+            created_at:      ts
         )
         Task {
             await state.saveConfig(cfg)
