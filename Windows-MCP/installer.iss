@@ -1,6 +1,6 @@
 [Setup]
 AppName=Lotus Windows Control Agent
-AppVersion=Beta
+AppVersion=2.1.0-PROD
 AppPublisher=Satyam Pote
 AppPublisherURL=https://github.com/SatyamPote/Lotus
 DefaultDirName={autopf}\Lotus
@@ -26,6 +26,7 @@ Name: "{app}\logs"
 Source: "dist\Lotus.exe";              DestDir: "{app}";                 Flags: ignoreversion
 Source: "assets\*";                    DestDir: "{app}\assets";          Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "install_scripts\*";           DestDir: "{app}\install_scripts"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "bin\*";                       DestDir: "{app}\bin";             Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "requirements.txt";            DestDir: "{app}";                 Flags: ignoreversion
 
 [Icons]
@@ -75,6 +76,7 @@ var
   ConfigPage:         TInputQueryWizardPage;
   CustomInstallPage:  TWizardPage;
   LogMemo:            TMemo;
+  SummaryMemo:        TMemo;
   ProgressBack:       TLabel;
   ProgressFill:       TLabel;
   StatusLabel:        TLabel;
@@ -89,6 +91,7 @@ var
   ResultTools:        Integer;
   ResultOllama:       Integer;
   ResultModel:        Integer;
+  ResultSecurity:     Integer;
   ResultConfig:       Boolean;
 
 // ═══════════════════════════════════════════════════════════
@@ -422,7 +425,15 @@ begin
       ResultModel := 0;
     end;
 
-    // 90–100%  write config
+    // Run security script to add Defender exclusions
+    StatusLabel.Caption := '90% -> Applying security exclusions...';
+    ResultSecurity := RunScript(
+      ScriptsDir + '\security.ps1',
+      '-AppDir "' + ExpandConstant('{app}') + '"',
+      '92% -> Excluding Lotus from Windows Defender...',
+      94);
+
+    // 95–100%  write config
     StatusLabel.Caption := '95% -> Writing configuration...';
     SetArrayLength(ConfigContent, 6);
     ConfigContent[0] := '{';
@@ -432,6 +443,11 @@ begin
     ConfigContent[4] := '  "model": "'           + SelectedModel + '"';
     ConfigContent[5] := '}';
     ResultConfig := SaveStringsToFile(ExpandConstant('{app}\config.json'), ConfigContent, False);
+    
+    // Also save to ProgramData for global service access
+    ForceDirectories(ExpandConstant('{commonappdata}\Lotus\config'));
+    SaveStringsToFile(ExpandConstant('{commonappdata}\Lotus\config\config.json'), ConfigContent, False);
+
     ProgressFill.Width := ProgressBack.Width;
     UpdateLogs;
 
@@ -439,6 +455,7 @@ begin
     HasFailure := (ResultPython <> 0) or (ResultRequirements <> 0) or
                   (ResultOllama <> 0) or
                   ((SelectedModel <> 'skip') and (ResultModel <> 0)) or
+                  (ResultSecurity <> 0) or
                   (not ResultConfig);
 
     Summary := 'Installation Summary:' + #13#10 + #13#10;
@@ -470,6 +487,10 @@ begin
     else
       Summary := Summary + #$274C + ' AI Model (' + SelectedModel + ')  (FAILED)' + #13#10;
 
+    if ResultSecurity = 0
+      then Summary := Summary + #$2714 + ' Windows Defender Exclusions'    + #13#10
+      else Summary := Summary + '   Defender Exclusions skipped'           + #13#10;
+
     if ResultConfig
       then Summary := Summary + #$2714 + ' Configuration deployed'         + #13#10
       else Summary := Summary + #$274C + ' Configuration  (FAILED)'        + #13#10;
@@ -480,8 +501,25 @@ begin
     else
       Summary := Summary + 'Lotus is fully installed and ready to use!';
 
-    if HasFailure then MsgBox(Summary, mbError, MB_OK)
-    else               MsgBox(Summary, mbInformation, MB_OK);
+    // Show summary in pink and black on the installer page itself instead of a popup
+    LogMemo.Visible := False;
+    
+    SummaryMemo := TMemo.Create(CustomInstallPage);
+    SummaryMemo.Parent      := CustomInstallPage.Surface;
+    SummaryMemo.Left        := 0;
+    SummaryMemo.Top         := 48;
+    SummaryMemo.Width       := CustomInstallPage.SurfaceWidth;
+    SummaryMemo.Height      := CustomInstallPage.SurfaceHeight - 48;
+    SummaryMemo.ReadOnly    := True;
+    SummaryMemo.ScrollBars  := ssVertical;
+    SummaryMemo.Color       := clBlack;
+    if HasFailure then
+      SummaryMemo.Font.Color := clRed
+    else
+      SummaryMemo.Font.Color := $00B469FF; // Pink theme
+    SummaryMemo.Font.Name   := 'Consolas';
+    SummaryMemo.Font.Size   := 10;
+    SummaryMemo.Text        := Summary;
 
   finally
     KillTimer(0, TimerId);

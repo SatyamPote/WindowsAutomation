@@ -881,7 +881,7 @@ if __name__ == "__main__":
     # If bot is not running and config exists, start it immediately
     # (before the slow GUI loads)
     config = load_config()
-    if config and config.get("bot_token") and not _is_bot_alive():
+    if config and (config.get("telegram_token") or config.get("bot_token")) and not _is_bot_alive():
         _log.info("Pre-launching bot service before GUI...")
         try:
             _start_bot_service()

@@ -49,12 +49,18 @@ def _find_ytdlp() -> str | None:
 
 
 def _find_python() -> str:
-    """Find python.exe (not pythonw.exe)."""
+    """Find python.exe (not pythonw.exe or Lotus.exe GUI)."""
+    # Prefer system python because PyInstaller's sys.executable (Lotus.exe) 
+    # is a GUI app and cannot spawn a visible console!
+    system_python = shutil.which("python") or shutil.which("python3")
+    if getattr(sys, 'frozen', False):
+        return system_python or "python"
+        
     python_exe = sys.executable
     if "pythonw" in python_exe.lower():
         python_exe = python_exe.lower().replace("pythonw.exe", "python.exe")
         if not os.path.exists(python_exe):
-            python_exe = shutil.which("python") or shutil.which("python3") or "python"
+            python_exe = system_python or "python"
     return python_exe
 
 
@@ -86,6 +92,10 @@ class DownloadManager:
         python_exe = _find_python()
 
         try:
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 1 # SW_NORMAL
+            
             self.process = subprocess.Popen(
                 [
                     python_exe, _DL_TUI_SCRIPT,
@@ -100,6 +110,7 @@ class DownloadManager:
                 ],
                 cwd=_THIS_DIR,
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
+                startupinfo=si,
             )
             mode_str = "🎵 Audio" if audio_only else f"🎬 Video ({quality}p)"
             return True, (
@@ -122,6 +133,10 @@ class DownloadManager:
         python_exe = _find_python()
 
         try:
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 1 # SW_NORMAL
+            
             self.process = subprocess.Popen(
                 [
                     python_exe, _DL_TUI_SCRIPT,
@@ -133,6 +148,7 @@ class DownloadManager:
                 ],
                 cwd=_THIS_DIR,
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
+                startupinfo=si,
             )
             return True, (
                 f"📥 **Downloading File**\n"
@@ -152,6 +168,10 @@ class DownloadManager:
         python_exe = _find_python()
 
         try:
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 1 # SW_NORMAL
+            
             self.process = subprocess.Popen(
                 [
                     python_exe, _DL_TUI_SCRIPT,
@@ -164,6 +184,7 @@ class DownloadManager:
                 ],
                 cwd=_THIS_DIR,
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
+                startupinfo=si,
             )
             return True, (
                 f"🖼️ **Downloading Images**\n"

@@ -6,6 +6,7 @@ pyautogui
 pygetwindow
 Pillow
 yt-dlp
+tiny-tts
 pyttsx3
 pystray
 rich
@@ -13,3 +14,7 @@ requests
 pyperclip
 thefuzz
 python-Levenshtein
+opencv-python
+numpy
+pycaw
+comtypes

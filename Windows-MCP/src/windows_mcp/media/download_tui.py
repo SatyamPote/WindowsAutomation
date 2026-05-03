@@ -124,8 +124,32 @@ def render_frame(state: dict):
     print("\n".join(out), end="", flush=True)
 
 
+def _find_ffmpeg():
+    """Find ffmpeg.exe in the app's bin directory or PATH."""
+    import sys
+    # Check bin directory relative to the EXE (frozen) or script
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        # src/windows_mcp/media/download_tui.py -> project_root/bin/ffmpeg.exe
+        base = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    
+    candidates = [
+        os.path.join(base, "bin", "ffmpeg.exe"),
+        os.path.join(base, "ffmpeg.exe"),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return "ffmpeg" # Fallback to PATH
+
+
 def download_youtube(args):
     """Download YouTube content natively via yt_dlp."""
+    import yt_dlp
+    
+    ffmpeg_path = _find_ffmpeg()
+    
     state = {
         "mode": "YouTube Audio" if args.audio_only == "True" else f"YouTube {args.quality}p",
         "status": "starting",
@@ -138,7 +162,6 @@ def download_youtube(args):
     render_frame(state)
 
     try:
-        import yt_dlp
         import time
 
         def progress_hook(d):
@@ -175,6 +198,7 @@ def download_youtube(args):
                 render_frame(state)
 
         ydl_opts = {
+            'ffmpeg_location': ffmpeg_path,
             'outtmpl': os.path.join(args.output, '%(title)s.%(ext)s'),
             'progress_hooks': [progress_hook],
             'quiet': True,
