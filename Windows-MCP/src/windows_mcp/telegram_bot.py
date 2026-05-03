@@ -517,7 +517,7 @@ def _ollama_chat(text: str) -> str | None:
                 "prompt": f"{system_prompt}\n\nUser says: {text}",
                 "stream": False
             },
-            timeout=30
+            timeout=5
         )
         if response.status_code == 200:
             reply = response.json().get("response", "").strip()
@@ -735,7 +735,36 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
         if "youtube.com" in query or "youtu.be" in query:
             return {"success": True, "message": f"📥 Download queued: {query}"}
 
-    # ── 5. AI FALLBACK ──
+    # ── 5. VOICE COMMANDS ──
+    if t == "voice on": return {"success": True, "message": voice_system.toggle_voice(True)}
+    if t == "voice off": return {"success": True, "message": voice_system.toggle_voice(False)}
+    if t == "stop voice":
+        voice_system.stop_voice()
+        return {"success": True, "message": "🔇 Local voice stopped."}
+    
+    if first_word == "say":
+        words = t[4:].strip()
+        if words:
+            voice_system.speak(words)
+            return {"success": True, "message": f"🗣️ Speaking: {words}"}
+        return {"success": False, "message": "❓ Say what?"}
+
+    if t == "voice auto on":
+        voice_system.auto_voice = True
+        return {"success": True, "message": "🎙️ Auto-voice feedback: ON"}
+    if t == "voice auto off":
+        voice_system.auto_voice = False
+        return {"success": True, "message": "🎙️ Auto-voice feedback: OFF"}
+
+    if t.startswith("voice style"):
+        style = t.replace("voice style", "").strip()
+        if style in ["female", "male"]:
+            voice_system.config["style"] = style
+            voice_system.save_config()
+            return {"success": True, "message": f"🎭 Voice style set to: {style}"}
+        return {"success": False, "message": "❓ Style must be 'female' or 'male'."}
+
+    # ── 6. AI FALLBACK ──
     chat_resp = _chat_reply(raw_text)
     if chat_resp:
         return {"success": True, "message": chat_resp}
@@ -989,6 +1018,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             await processing_msg.edit_text(f"{FRAME_TOP}{icon} {msg}{FRAME_BTM}", parse_mode="Markdown")
             
+            # Voice Feedback (if enabled)
+            if voice_system.auto_voice and success:
+                # Clean markdown for TTS
+                tts_text = msg.replace("*", "").replace("_", "").replace("`", "")
+                voice_system.speak(tts_text)
+            
     except Exception as e:
         log_error(text, e)
         await processing_msg.edit_text(f"{FRAME_TOP}❌ Critical Error occurred. Check logs.{FRAME_BTM}", parse_mode="Markdown")
@@ -1115,6 +1150,9 @@ def run_bot(token: str = None) -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+    # Silence noisy comtypes debug logs
+    logging.getLogger("comtypes").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
         run_bot()
     except KeyboardInterrupt:

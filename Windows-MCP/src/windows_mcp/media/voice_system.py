@@ -4,11 +4,9 @@ import logging
 import threading
 import json
 import subprocess
-import pyttsx3
 import pythoncom
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-from comtypes import CLSCTX_ALL
 from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
 
 logger = logging.getLogger(__name__)
 
@@ -63,16 +61,9 @@ class VoiceSystem:
             from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
             devices = AudioUtilities.GetSpeakers()
             # If the direct Activate fails, we try to find it in the list
-            try:
-                interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            except:
-                from pycaw.pycaw import CLSID_MMDeviceEnumerator, IMMDeviceEnumerator
-                import comtypes
-                enumerator = comtypes.CoCreateInstance(CLSID_MMDeviceEnumerator, IMMDeviceEnumerator, comtypes.CLSCTX_INPROC_SERVER)
-                endpoint = enumerator.GetDefaultAudioEndpoint(0, 1) # eRender, eMultimedia
-                interface = endpoint.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            
+            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
             volume = cast(interface, POINTER(IAudioEndpointVolume))
+            volume.SetMute(0, None)
             volume.SetMasterVolumeLevelScalar(1.0, None)
         except Exception as e:
             self.voice_logger.error(f"Failed to set max volume: {e}")
@@ -99,6 +90,8 @@ class VoiceSystem:
         save_path = os.path.join(self.storage_dir, filename)
         
         try:
+            import pyttsx3
+            import pythoncom
             pythoncom.CoInitialize()
             temp_engine = pyttsx3.init()
             
