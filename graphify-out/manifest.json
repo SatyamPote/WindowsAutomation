@@ -1,0 +1,570 @@
+{
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/bot_service.py": {
+    "mtime": 1777798568.73,
+    "hash": "20d15cadf863f26b8b41df4b4ada0fa3"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/app.py": {
+    "mtime": 1777761374.52,
+    "hash": "67de5c4cf2eea46d3af2005f4db9a1b8"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/__init__.py": {
+    "mtime": 1777755191.41,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/config.py": {
+    "mtime": 1777755193.98,
+    "hash": "55d50cb38a41419b662aa19e8a5b5f49"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/paths.py": {
+    "mtime": 1777755194.64,
+    "hash": "34e059bdf3d043a5b3cc6254d6e38077"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/analytics.py": {
+    "mtime": 1777755215.09,
+    "hash": "078a414563c5be7c5df41b429eeb64fd"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/permissions.py": {
+    "mtime": 1777755225.15,
+    "hash": "abf718616f798eef147b6a461a22cc29"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/__main__.py": {
+    "mtime": 1777759884.93,
+    "hash": "cf8cf4c2ec3f0d8843db9992f91fd3f2"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/telegram_bot.py": {
+    "mtime": 1777759905.53,
+    "hash": "557e8d8b77bee0f800c8376887c5a016"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/control_api.py": {
+    "mtime": 1777798544.79,
+    "hash": "8b6a56e0f66104373da8cea84553a9f1"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/desktop/__init__.py": {
+    "mtime": 1777755227.7,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/desktop/views.py": {
+    "mtime": 1777755244.52,
+    "hash": "fdfd126f1e3cb02f3b310d7a235e0572"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/desktop/screenshot.py": {
+    "mtime": 1777755529.75,
+    "hash": "5025c14fdba574d06ef8656ccb152081"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/desktop/shell.py": {
+    "mtime": 1777755276.44,
+    "hash": "2fefc9ec64f6346e612658feda83b512"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/desktop/service.py": {
+    "mtime": 1777759261.96,
+    "hash": "3f9b8a8a5937e270f6f327f08a2ca18f"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/desktop/utils.py": {
+    "mtime": 1777756820.38,
+    "hash": "2c2575dab5b957cfb6fb9e0a83041add"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/__init__.py": {
+    "mtime": 1777759269.93,
+    "hash": "58c409084a7ffe8f764541058b6fc4bc"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/shell.py": {
+    "mtime": 1777755293.34,
+    "hash": "d8e6a748c8f575d5a67c4822cb9bae95"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/_snapshot_helpers.py": {
+    "mtime": 1777756993.25,
+    "hash": "03c4f932c20183944c88bdf4e41b2ecd"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/snapshot.py": {
+    "mtime": 1777756896.53,
+    "hash": "c5d6accc1c7ebcb603419cd4436d8856"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/input.py": {
+    "mtime": 1777757794.66,
+    "hash": "824ef534152477d6105bcc19625dcdd3"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/app.py": {
+    "mtime": 1777757805.81,
+    "hash": "715616f0f147307db6e0d45b6b037440"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/filesystem.py": {
+    "mtime": 1777759186.87,
+    "hash": "0a3d8c4b2751912ad374f23b3a300368"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/clipboard.py": {
+    "mtime": 1777759191.82,
+    "hash": "250b5c8b4eb6e18eaa3b705c30be35a5"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/process.py": {
+    "mtime": 1777759196.52,
+    "hash": "d6afb2d245c0e345b6a66ffc7242630c"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/scrape.py": {
+    "mtime": 1777759208.95,
+    "hash": "3f815d94592c6a4e183fd17ac1b0a391"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/notification.py": {
+    "mtime": 1777759215.59,
+    "hash": "48fbab3c4913ff69c13171562c01f95c"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/defaults.py": {
+    "mtime": 1777759223.32,
+    "hash": "cb8b47c9995278a6b1c8c5751e423836"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tools/multi.py": {
+    "mtime": 1777759234.27,
+    "hash": "5146ebc2fbaca206569ba0ffccbc0882"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tree/__init__.py": {
+    "mtime": 1777755228.66,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tree/views.py": {
+    "mtime": 1777756755.21,
+    "hash": "5d431554df56d8cdf943afdb0f196c43"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tree/config.py": {
+    "mtime": 1777756741.91,
+    "hash": "fd97aede63fd438ab85edfa11fb69db2"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/tree/service.py": {
+    "mtime": 1777756962.39,
+    "hash": "8c5869a394c3a3a89a6a0b49cb78d7af"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/ax/__init__.py": {
+    "mtime": 1777756665.98,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/ax/enums.py": {
+    "mtime": 1777756678.32,
+    "hash": "24d7dca747840d6975b5aff082ad758f"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/ax/core.py": {
+    "mtime": 1777756701.8,
+    "hash": "3ca3bd3970e594a6aa7c073b83226234"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/ax/controls.py": {
+    "mtime": 1777756718.19,
+    "hash": "27af2b89c54cc4dbe4ea411700cb76be"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/ax/events.py": {
+    "mtime": 1777756724.39,
+    "hash": "0f5ffef3f8dc1ca849fa764e249e8632"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/watchdog/__init__.py": {
+    "mtime": 1777756756.73,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/watchdog/service.py": {
+    "mtime": 1777756806.8,
+    "hash": "20b485e365c876fc321032235f272b0b"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/launcher/__init__.py": {
+    "mtime": 1777757511.74,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/launcher/app_registry.py": {
+    "mtime": 1777757516.12,
+    "hash": "258299e2b6b3b157223813971553e439"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/launcher/detection.py": {
+    "mtime": 1777757517.84,
+    "hash": "5173126d161f1d22dc25bfc1e2dc85f9"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/launcher/app_launcher.py": {
+    "mtime": 1777757518.93,
+    "hash": "c411b5840890c59955656916927abf6a"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/filesystem/views.py": {
+    "mtime": 1777759052.83,
+    "hash": "b9acef31bc43f6defd6cd8cb6ee9f97b"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/filesystem/service.py": {
+    "mtime": 1777759087.02,
+    "hash": "3bddff9367323d6cc5195a0059cc4db0"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/filesystem/__init__.py": {
+    "mtime": 1777759170.42,
+    "hash": "0f9752117658191c7566af8f364e632c"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/spaces/__init__.py": {
+    "mtime": 1777760632.04,
+    "hash": "767594214e8262d449effdd95c1eb6d2"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/src/mac_mcp/spaces/core.py": {
+    "mtime": 1777760639.91,
+    "hash": "7469a4cfaf8bc821cd9dfdf0c8f25f62"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_filesystem_views.py": {
+    "mtime": 1777760526.2,
+    "hash": "ec5e0260c51fac63ad17cd23ea84003d"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/__init__.py": {
+    "mtime": 1777755310.46,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/conftest.py": {
+    "mtime": 1777760489.25,
+    "hash": "2a81c73edd4a445598f672748fb30189"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_desktop_utils.py": {
+    "mtime": 1777760498.72,
+    "hash": "8300e26bb6d70173f57fb07c8c2d35fd"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_desktop_views.py": {
+    "mtime": 1777760513.43,
+    "hash": "8e1eb997fbfcc2c6914a7448649687f5"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_filesystem_service.py": {
+    "mtime": 1777760567.85,
+    "hash": "3099cec2668a4da3795fa3950751f443"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_analytics.py": {
+    "mtime": 1777760587.37,
+    "hash": "a6a749548c871ad7a39c8e6eed9c05ee"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_paths.py": {
+    "mtime": 1777760593.11,
+    "hash": "5dc7206e478f99fd35dbb4d117e40b55"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_shell_executor.py": {
+    "mtime": 1777760605.59,
+    "hash": "9ee24efe9dca4e518844a5612af0cce6"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_permissions.py": {
+    "mtime": 1777760617.18,
+    "hash": "f27e308eacc24f6fbddb25193230eec9"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/tests/test_spaces.py": {
+    "mtime": 1777760654.22,
+    "hash": "3fafe39cb3227b13acc5b183b5e27b49"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Package.swift": {
+    "mtime": 1777828952.73,
+    "hash": "7fda3d7c10b70e5971ed614cc6ca86c0"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/AppState.swift": {
+    "mtime": 1777829532.68,
+    "hash": "95c5c7e25656a655126819c099034ef5"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/AppDelegate.swift": {
+    "mtime": 1777800519.76,
+    "hash": "7c328ae65cef0dd544d9cbd8a894e76f"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/ContentView.swift": {
+    "mtime": 1777829537.18,
+    "hash": "3ccab8936086340a06bf2910ac946463"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/LotusApp.swift": {
+    "mtime": 1777801313.73,
+    "hash": "9080f5b416daf0389b795741ae4ad3ba"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Models/AppConfig.swift": {
+    "mtime": 1777829980.2,
+    "hash": "3a99d4e7a571b762e51136719088876f"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Models/ServiceStatus.swift": {
+    "mtime": 1777799064.35,
+    "hash": "a9f8b5850c108e75dc244538655c142f"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Services/LotusServiceClient.swift": {
+    "mtime": 1777799078.02,
+    "hash": "255adab337167cdf77d9512d3de19b23"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Services/ServiceManager.swift": {
+    "mtime": 1777828989.0,
+    "hash": "804be18de1c5936fa6dd1e91716f7990"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Services/OllamaClient.swift": {
+    "mtime": 1777799694.15,
+    "hash": "0ee5ec88a922f3ef306ca5e3a8152cdc"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Services/InstallManager.swift": {
+    "mtime": 1777829502.2,
+    "hash": "1bd93407b51d766c4e10942a5a83e0c4"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Views/SetupView.swift": {
+    "mtime": 1777830006.46,
+    "hash": "3e06120c22875c65cadca29bac02b3df"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Views/Theme.swift": {
+    "mtime": 1777801289.38,
+    "hash": "145596c61abd7202f65afae568a3f4e5"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Views/OllamaModelPicker.swift": {
+    "mtime": 1777801400.02,
+    "hash": "76b53c0c48169ba7d7e51196c2363311"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Views/InstallerView.swift": {
+    "mtime": 1777829522.1,
+    "hash": "ca6fbf4959fc23ef6226d1dabf50f584"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Views/ControlPanelView.swift": {
+    "mtime": 1777829005.56,
+    "hash": "d2ce58bad0521ad48cb55b68e8f01dd8"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/bot_service.py": {
+    "mtime": 1777828944.25,
+    "hash": "b7360fd7ff5f276098145c41f6ffc0a2"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/__init__.py": {
+    "mtime": 1777755191.0,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/__main__.py": {
+    "mtime": 1777759884.0,
+    "hash": "cf8cf4c2ec3f0d8843db9992f91fd3f2"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/analytics.py": {
+    "mtime": 1777755215.0,
+    "hash": "078a414563c5be7c5df41b429eeb64fd"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/config.py": {
+    "mtime": 1777755193.0,
+    "hash": "55d50cb38a41419b662aa19e8a5b5f49"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/control_api.py": {
+    "mtime": 1777798544.0,
+    "hash": "8b6a56e0f66104373da8cea84553a9f1"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/paths.py": {
+    "mtime": 1777755194.0,
+    "hash": "34e059bdf3d043a5b3cc6254d6e38077"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/permissions.py": {
+    "mtime": 1777755225.0,
+    "hash": "abf718616f798eef147b6a461a22cc29"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/telegram_bot.py": {
+    "mtime": 1777759905.0,
+    "hash": "557e8d8b77bee0f800c8376887c5a016"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/ax/__init__.py": {
+    "mtime": 1777756665.0,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/ax/controls.py": {
+    "mtime": 1777756718.0,
+    "hash": "27af2b89c54cc4dbe4ea411700cb76be"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/ax/core.py": {
+    "mtime": 1777756701.0,
+    "hash": "3ca3bd3970e594a6aa7c073b83226234"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/ax/enums.py": {
+    "mtime": 1777756678.0,
+    "hash": "24d7dca747840d6975b5aff082ad758f"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/ax/events.py": {
+    "mtime": 1777756724.0,
+    "hash": "0f5ffef3f8dc1ca849fa764e249e8632"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/desktop/__init__.py": {
+    "mtime": 1777755227.0,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/desktop/screenshot.py": {
+    "mtime": 1777755529.0,
+    "hash": "5025c14fdba574d06ef8656ccb152081"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/desktop/service.py": {
+    "mtime": 1777759261.0,
+    "hash": "3f9b8a8a5937e270f6f327f08a2ca18f"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/desktop/shell.py": {
+    "mtime": 1777755276.0,
+    "hash": "2fefc9ec64f6346e612658feda83b512"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/desktop/utils.py": {
+    "mtime": 1777756820.0,
+    "hash": "2c2575dab5b957cfb6fb9e0a83041add"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/desktop/views.py": {
+    "mtime": 1777755244.0,
+    "hash": "fdfd126f1e3cb02f3b310d7a235e0572"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/filesystem/__init__.py": {
+    "mtime": 1777759170.0,
+    "hash": "0f9752117658191c7566af8f364e632c"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/filesystem/service.py": {
+    "mtime": 1777759087.0,
+    "hash": "3bddff9367323d6cc5195a0059cc4db0"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/filesystem/views.py": {
+    "mtime": 1777759052.0,
+    "hash": "b9acef31bc43f6defd6cd8cb6ee9f97b"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/launcher/__init__.py": {
+    "mtime": 1777757511.0,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/launcher/app_launcher.py": {
+    "mtime": 1777757518.0,
+    "hash": "c411b5840890c59955656916927abf6a"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/launcher/app_registry.py": {
+    "mtime": 1777757516.0,
+    "hash": "258299e2b6b3b157223813971553e439"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/launcher/detection.py": {
+    "mtime": 1777757517.0,
+    "hash": "5173126d161f1d22dc25bfc1e2dc85f9"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/spaces/__init__.py": {
+    "mtime": 1777760632.0,
+    "hash": "767594214e8262d449effdd95c1eb6d2"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/spaces/core.py": {
+    "mtime": 1777760639.0,
+    "hash": "7469a4cfaf8bc821cd9dfdf0c8f25f62"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/__init__.py": {
+    "mtime": 1777759269.0,
+    "hash": "58c409084a7ffe8f764541058b6fc4bc"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/_snapshot_helpers.py": {
+    "mtime": 1777756993.0,
+    "hash": "03c4f932c20183944c88bdf4e41b2ecd"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/app.py": {
+    "mtime": 1777757805.0,
+    "hash": "715616f0f147307db6e0d45b6b037440"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/clipboard.py": {
+    "mtime": 1777759191.0,
+    "hash": "250b5c8b4eb6e18eaa3b705c30be35a5"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/defaults.py": {
+    "mtime": 1777759223.0,
+    "hash": "cb8b47c9995278a6b1c8c5751e423836"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/filesystem.py": {
+    "mtime": 1777759186.0,
+    "hash": "0a3d8c4b2751912ad374f23b3a300368"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/input.py": {
+    "mtime": 1777757794.0,
+    "hash": "824ef534152477d6105bcc19625dcdd3"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/multi.py": {
+    "mtime": 1777759234.0,
+    "hash": "5146ebc2fbaca206569ba0ffccbc0882"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/notification.py": {
+    "mtime": 1777759215.0,
+    "hash": "48fbab3c4913ff69c13171562c01f95c"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/process.py": {
+    "mtime": 1777759196.0,
+    "hash": "d6afb2d245c0e345b6a66ffc7242630c"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/scrape.py": {
+    "mtime": 1777759208.0,
+    "hash": "3f815d94592c6a4e183fd17ac1b0a391"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/shell.py": {
+    "mtime": 1777755293.0,
+    "hash": "d8e6a748c8f575d5a67c4822cb9bae95"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tools/snapshot.py": {
+    "mtime": 1777756896.0,
+    "hash": "c5d6accc1c7ebcb603419cd4436d8856"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tree/__init__.py": {
+    "mtime": 1777755228.0,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tree/config.py": {
+    "mtime": 1777756741.0,
+    "hash": "fd97aede63fd438ab85edfa11fb69db2"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tree/service.py": {
+    "mtime": 1777756962.0,
+    "hash": "8c5869a394c3a3a89a6a0b49cb78d7af"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/tree/views.py": {
+    "mtime": 1777756755.0,
+    "hash": "5d431554df56d8cdf943afdb0f196c43"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/watchdog/__init__.py": {
+    "mtime": 1777756756.0,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/ControlPanel/Sources/Lotus/Resources/src/mac_mcp/watchdog/service.py": {
+    "mtime": 1777756806.0,
+    "hash": "20b485e365c876fc321032235f272b0b"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/IMPLEMENTATION.md": {
+    "mtime": 1777754076.38,
+    "hash": "fc79d8df61b8acc0e84bda133c06d800"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/PHASE_1.md": {
+    "mtime": 1777754339.49,
+    "hash": "01c534f5ef3899a174f2594ba2b864be"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/PHASE_2.md": {
+    "mtime": 1777754418.33,
+    "hash": "1c764ca2c4591ff1c801817942535f6a"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/PHASE_3.md": {
+    "mtime": 1777754465.85,
+    "hash": "dcb91ee0e63ee62b65a57fb63f47bf7a"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/PHASE_4.md": {
+    "mtime": 1777754517.42,
+    "hash": "2e293f9ba4225ecab7e1d528932d1ec6"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/PHASE_5.md": {
+    "mtime": 1777754583.3,
+    "hash": "445b23b1076c3d8962a3e87d48a86df6"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/SETUP.md": {
+    "mtime": 1777800209.84,
+    "hash": "50100471dda93f702826b08c0c0ed28e"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/STATUS.md": {
+    "mtime": 1777761212.21,
+    "hash": "d408778dae9386222fc9c7c1f9e971a9"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/implementationmacosapp.md": {
+    "mtime": 1777798129.6,
+    "hash": "42d18503e84518896731de0259a7f9c0"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/banner.png": {
+    "mtime": 1777760234.1,
+    "hash": "712ea590eb219b8fe6f27a8f5c01fa3a"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/bg_pond.png": {
+    "mtime": 1777760234.11,
+    "hash": "114071ce1aab2a65d8fcfa1c9d48521a"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/logo.png": {
+    "mtime": 1777760234.12,
+    "hash": "23d147db49ba20a050876b10d952a4ef"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/logo_white.png": {
+    "mtime": 1777760234.12,
+    "hash": "5215e666e53ce3b850a0238dfcf5c592"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/lotus_logo.png": {
+    "mtime": 1777760234.15,
+    "hash": "1523cc8ad82caf7743ea97140ac5e9b6"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/mac_app_icon.png": {
+    "mtime": 1777805204.47,
+    "hash": "b0b84aa09530033e929346f75d7044fe"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/screenshots/screenshot_1.png": {
+    "mtime": 1777760234.16,
+    "hash": "2da88833b60a89dc12361f2571bd34a2"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/screenshots/screenshot_2.png": {
+    "mtime": 1777760234.17,
+    "hash": "11fbea01180590a99ec17af146f9b3da"
+  },
+  "/Volumes/1TB SSD/Github/Lotus/Mac-MCP/assets/screenshots/screenshot_3.png": {
+    "mtime": 1777760234.17,
+    "hash": "c14bab9eed3075a2c5053dcccebdcfa3"
+  }
+}
