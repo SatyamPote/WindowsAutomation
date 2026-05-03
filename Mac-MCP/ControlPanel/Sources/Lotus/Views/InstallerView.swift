@@ -67,16 +67,26 @@ struct InstallerView: View {
     private func stepRow(_ step: InstallStep) -> some View {
         let status = installer.statuses[step] ?? .pending
         return HStack(spacing: 14) {
-            stepIcon(status)
+            stepIcon(status, optional: step.isOptional)
                 .frame(width: 26, height: 26)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(step.rawValue)
-                    .font(.body.weight(.medium))
+                HStack(spacing: 6) {
+                    Text(step.rawValue)
+                        .font(.body.weight(.medium))
+                    if step.isOptional {
+                        Text("optional")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(.secondary.opacity(0.12), in: Capsule())
+                    }
+                }
                 if case .failed(let msg) = status {
                     Text(msg.prefix(120))
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(step.isOptional ? .orange : .red)
                         .lineLimit(3)
                 } else {
                     Text(step.description)
@@ -87,14 +97,14 @@ struct InstallerView: View {
 
             Spacer()
 
-            statusBadge(status)
+            statusBadge(status, optional: step.isOptional)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
     }
 
     @ViewBuilder
-    private func stepIcon(_ status: StepStatus) -> some View {
+    private func stepIcon(_ status: StepStatus, optional: Bool = false) -> some View {
         switch status {
         case .pending:
             Image(systemName: "circle")
@@ -112,14 +122,14 @@ struct InstallerView: View {
                 .font(.title3)
                 .foregroundStyle(Color.secondary.opacity(0.7))
         case .failed:
-            Image(systemName: "xmark.circle.fill")
+            Image(systemName: optional ? "exclamationmark.circle.fill" : "xmark.circle.fill")
                 .font(.title3)
-                .foregroundStyle(.red)
+                .foregroundStyle(optional ? .orange : .red)
         }
     }
 
     @ViewBuilder
-    private func statusBadge(_ status: StepStatus) -> some View {
+    private func statusBadge(_ status: StepStatus, optional: Bool = false) -> some View {
         Group {
             switch status {
             case .pending:
@@ -131,7 +141,8 @@ struct InstallerView: View {
             case .skipped:
                 Text("Ready").foregroundStyle(.secondary)
             case .failed:
-                Text("Failed").foregroundStyle(.red)
+                Text(optional ? "Skipped" : "Failed")
+                    .foregroundStyle(optional ? .orange : .red)
             }
         }
         .font(.caption.weight(.medium))

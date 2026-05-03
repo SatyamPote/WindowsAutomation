@@ -29,6 +29,9 @@ from telegram.ext import (
 
 logger = logging.getLogger(__name__)
 
+from mac_mcp.media.downloader import download_manager
+from mac_mcp.media.music_player import music_player
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -593,19 +596,75 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
         await asyncio.to_thread(subprocess.run, ["open", f"https://www.google.com/search?q={encoded}"], check=False)
         return {"success": True, "message": f"🌐 Searching '{q}' on Google"}
 
-    # ── Download (yt-dlp) ──
+    # ── Music player ──
+    if first == "play":
+        query = t[4:].strip()
+        if not query:
+            return {"success": False, "message": "Play what? e.g. `play Bohemian Rhapsody`"}
+        ok, msg = music_player.play_song(query)
+        return {"success": ok, "message": msg}
+
+    if t_lower == "pause":
+        ok, msg = music_player.pause()
+        return {"success": ok, "message": msg}
+
+    if t_lower == "resume":
+        ok, msg = music_player.resume()
+        return {"success": ok, "message": msg}
+
+    if t_lower in ("stop music", "music stop", "stopmusic"):
+        ok, msg = music_player.stop()
+        return {"success": ok, "message": msg}
+
+    if t_lower in ("volume up", "vol up"):
+        ok, msg = music_player.volume_up()
+        return {"success": ok, "message": msg}
+
+    if t_lower in ("volume down", "vol down"):
+        ok, msg = music_player.volume_down()
+        return {"success": ok, "message": msg}
+
+    if t_lower == "next":
+        ok, msg = music_player.next_song()
+        return {"success": ok, "message": msg}
+
+    if t_lower in ("now playing", "np"):
+        ok, msg = music_player.now_playing()
+        return {"success": ok, "message": msg}
+
+    # ── Download (yt-dlp / curl / images) ──
     if first == "download":
         rest = t[8:].strip()
         if not rest:
-            return {"success": False, "message": "Download what?\n• `download <url>`\n• `download youtube <url>`"}
+            return {
+                "success": False,
+                "message": (
+                    "Download what?\n"
+                    "• `download <url>` — any file\n"
+                    "• `download youtube <url>` — YouTube video/audio\n"
+                    "• `download images <topic>` — bulk image search"
+                ),
+            }
+
+        # Image bulk download
+        if rest.lower().startswith("images "):
+            topic = rest[7:].strip()
+            if not topic:
+                return {"success": False, "message": "Search for what? e.g. `download images cats`"}
+            await update.message.reply_text(f"🖼️ Searching images for *{topic}*…", parse_mode="Markdown")
+            ok, msg = await asyncio.to_thread(download_manager.download_images, topic)
+            return {"success": ok, "message": msg}
+
         orig_url = re.search(r"(https?://[^\s]+)", text)
         url = orig_url.group(1) if orig_url else rest
         if "youtube.com" in url or "youtu.be" in url:
             context.user_data["pending_download"] = {"url": url}
             buttons = [
-                [InlineKeyboardButton("360p", callback_data="dl:360"),
-                 InlineKeyboardButton("720p", callback_data="dl:720"),
-                 InlineKeyboardButton("1080p", callback_data="dl:1080")],
+                [
+                    InlineKeyboardButton("360p", callback_data="dl:360"),
+                    InlineKeyboardButton("720p", callback_data="dl:720"),
+                    InlineKeyboardButton("1080p", callback_data="dl:1080"),
+                ],
                 [InlineKeyboardButton("🎵 Audio only (MP3)", callback_data="dl:audio")],
             ]
             await update.message.reply_text(
@@ -614,16 +673,11 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
                 parse_mode="Markdown",
             )
             return {"success": True, "message": ""}
-        try:
-            out_path = str(STORAGE_FILES / os.path.basename(url.split("?")[0]))
-            result = await asyncio.to_thread(
-                subprocess.run,
-                ["curl", "-L", "-o", out_path, url],
-                capture_output=True, text=True, timeout=60,
-            )
-            return {"success": result.returncode == 0, "message": "✅ Downloaded." if result.returncode == 0 else f"❌ Failed: {result.stderr[:200]}"}
-        except Exception as e:
-            return {"success": False, "message": f"Download error: {e}"}
+
+        # General URL
+        await update.message.reply_text("⏳ Downloading…")
+        ok, msg = await asyncio.to_thread(download_manager.download_url, url)
+        return {"success": ok, "message": msg}
 
     # ── Dashboard ──
     if t_lower == "dashboard":
@@ -778,11 +832,15 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "*Procs:* `ps` · `kill Safari` · `killpid 1234`\n"
         "*Clipboard:* `clipboard` · `copy hello` · `paste`\n"
         "*Web:* `search AI news` · `open github.com`\n"
-        "*Download:* `download <url>` · `download youtube <url>`\n"
+        "*Download:* `download <url>` · `download youtube <url>` · `download images <topic>`\n"
+        "*Music:* `play <song>` · `pause` · `resume` · `stop music` · `next` · `np`\n"
+        "         `volume up` · `volume down`\n"
         "*Shortcuts:* `shortcut cmd+c`\n"
         "*Memory:* `set work = open vscode` · `my commands`\n"
         "*Logs:* `show logs` · `clear logs`\n"
-        "*Dashboard:* `dashboard`"
+        "*Dashboard:* `dashboard`\n\n"
+        "_Music requires: `brew install mpv yt-dlp`_\n"
+        "_Video download requires: `brew install yt-dlp ffmpeg`_"
     )
     await update.message.reply_text(help_text, parse_mode="Markdown")
 
@@ -857,20 +915,14 @@ async def cmd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await query.edit_message_text("⚠️ No pending download.")
             return
         url = pending.get("url", "")
-        await query.edit_message_text("⏳ Downloading…")
+        await query.edit_message_text("⏳ Downloading… (this may take a few minutes)")
+        audio_only = quality == "audio"
+        q = "720" if audio_only else quality
+        ok, msg = await asyncio.to_thread(download_manager.download_youtube, url, q, audio_only)
         try:
-            out_dir = str(STORAGE_FILES)
-            if quality == "audio":
-                cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "-o", f"{out_dir}/%(title)s.%(ext)s", url]
-            else:
-                cmd = ["yt-dlp", f"-f bestvideo[height<={quality}]+bestaudio/best[height<={quality}]", "-o", f"{out_dir}/%(title)s.%(ext)s", url]
-            result = await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=300)
-            if result.returncode == 0:
-                await query.edit_message_text(f"✅ Downloaded to `{out_dir}`")
-            else:
-                await query.edit_message_text(f"❌ Download failed:\n```{result.stderr[:300]}```", parse_mode="Markdown")
-        except Exception as e:
-            await query.edit_message_text(f"❌ Error: {e}")
+            await query.edit_message_text(msg, parse_mode="Markdown")
+        except Exception:
+            await query.edit_message_text(msg)
         return
 
     # Screenshot callback

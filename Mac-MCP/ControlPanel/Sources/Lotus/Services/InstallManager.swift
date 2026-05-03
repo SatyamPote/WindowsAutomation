@@ -6,13 +6,22 @@ enum InstallStep: String, CaseIterable, Sendable {
     case uv           = "Package manager (uv)"
     case python       = "Python 3.13"
     case dependencies = "Bot dependencies"
+    case brew         = "Homebrew"
+    case mediaTools   = "Media tools (ffmpeg · mpv)"
 
     var description: String {
         switch self {
         case .uv:           return "Installs uv, the fast Python package manager"
         case .python:       return "Installs a managed Python 3.13 runtime via uv"
         case .dependencies: return "Installs all bot libraries (uv sync)"
+        case .brew:         return "Required to install ffmpeg and mpv for media features"
+        case .mediaTools:   return "Enables video downloads, audio conversion, and music playback"
         }
+    }
+
+    /// Optional steps can fail without blocking the installer from completing.
+    var isOptional: Bool {
+        switch self { case .brew, .mediaTools: return true; default: return false }
     }
 }
 
@@ -120,9 +129,54 @@ final class InstallManager: ObservableObject {
                                        env: ProcessRunner.enrichedPATH(home: home),
                                        timeout: 600)
             if r.exitCode != 0 {
-                // Append last 10 lines of stderr for context
                 let detail = r.stderr.split(separator: "\n").suffix(10).joined(separator: "\n")
                 throw InstallError(detail.isEmpty ? "uv sync failed (exit \(r.exitCode))" : detail)
+            }
+            return .done
+        }
+
+        // ── Step 4: Homebrew (optional) ───────────────────────────────────
+        await run(step: .brew, isOptional: true) {
+            if ProcessRunner.findBrew() != nil { return .skipped }
+            log("  Installing Homebrew (may take a few minutes)…")
+            let r = ProcessRunner.exec(
+                ["/bin/bash", "-c",
+                 "curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | NONINTERACTIVE=1 bash"],
+                env: ProcessRunner.enrichedPATH(home: home),
+                timeout: 600
+            )
+            if r.exitCode != 0 {
+                let detail = r.stderr.split(separator: "\n").suffix(5).joined(separator: "\n")
+                throw InstallError(detail.isEmpty ? "Homebrew install failed (exit \(r.exitCode))" : detail)
+            }
+            return .done
+        }
+
+        let brewPath = ProcessRunner.findBrew()
+
+        // ── Step 5: Media tools — ffmpeg + mpv (optional) ─────────────────
+        await run(step: .mediaTools, isOptional: true) {
+            guard let brew = brewPath else {
+                throw InstallError(
+                    "Homebrew not found — run `brew install mpv ffmpeg` manually to enable music and video features"
+                )
+            }
+            let env = ProcessRunner.enrichedPATH(home: home)
+            var toInstall: [String] = []
+
+            let ffmpegCheck = ProcessRunner.exec([brew, "list", "--formula", "ffmpeg"], timeout: 10)
+            if ffmpegCheck.exitCode != 0 { toInstall.append("ffmpeg") }
+
+            let mpvCheck = ProcessRunner.exec([brew, "list", "--formula", "mpv"], timeout: 10)
+            if mpvCheck.exitCode != 0 { toInstall.append("mpv") }
+
+            if toInstall.isEmpty { return .skipped }
+
+            log("  Installing \(toInstall.joined(separator: " + "))…")
+            let r = ProcessRunner.exec([brew, "install"] + toInstall, env: env, timeout: 600)
+            if r.exitCode != 0 {
+                let detail = r.stderr.split(separator: "\n").suffix(8).joined(separator: "\n")
+                throw InstallError(detail.isEmpty ? "brew install failed (exit \(r.exitCode))" : detail)
             }
             return .done
         }
@@ -133,7 +187,11 @@ final class InstallManager: ObservableObject {
 
     // MARK: - Private helpers
 
-    private func run(step: InstallStep, work: @Sendable @escaping () throws -> StepStatus) async {
+    private func run(
+        step: InstallStep,
+        isOptional: Bool = false,
+        work: @Sendable @escaping () throws -> StepStatus
+    ) async {
         guard !hasFailed else { return }
         statuses[step] = .running
         appendLog("▸ \(step.rawValue)…")
@@ -144,7 +202,7 @@ final class InstallManager: ObservableObject {
         } catch {
             statuses[step] = .failed(error.localizedDescription)
             appendLog("  ✗ \(error.localizedDescription)")
-            hasFailed = true
+            if !isOptional { hasFailed = true }
         }
     }
 
@@ -172,6 +230,11 @@ struct ProcessRunner: Sendable {
             "/usr/local/bin/uv",
             "\(home)/.cargo/bin/uv",
         ].first { FileManager.default.fileExists(atPath: $0) }
+    }
+
+    static func findBrew() -> String? {
+        ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+            .first { FileManager.default.fileExists(atPath: $0) }
     }
 
     static func enrichedPATH(home: String) -> [String: String] {

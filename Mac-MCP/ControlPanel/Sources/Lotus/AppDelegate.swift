@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         show.target = self
         menu.addItem(show)
 
-        let toggle = NSMenuItem(title: "Toggle Bot", action: #selector(toggleBotAction), keyEquivalent: "")
+        let toggle = NSMenuItem(title: "Toggle Agent", action: #selector(toggleAgentAction), keyEquivalent: "")
         toggle.target = self
         menu.addItem(toggle)
 
@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func showWindowAction() { showWindow() }
 
-    @objc private func toggleBotAction() {
+    @objc private func toggleAgentAction() {
         Task {
             let state = AppState.shared
             // serviceStatus is nil until polling starts (window hasn't been shown yet).
@@ -98,9 +98,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 isRunning = await Task.detached { ServiceManager.shared.isProcessAlive() }.value
             }
             if isRunning {
-                await state.stopBot()
+                await state.stopAgent()
             } else {
-                await state.startBot()
+                await state.startAgent()
             }
         }
     }
