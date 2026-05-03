@@ -170,14 +170,18 @@ def main():
     render_frame(state)
 
     # ── Launch mpv (hidden, audio only) ──
+    # If query contains commas, it's a playlist
+    queries = [q.strip() for q in args.query.split(",") if q.strip()]
+    
     cmd = [
         args.mpv,
         "--no-video",
         "--term-status-msg=",
         "--msg-level=all=info",
-        f"--script-opts=ytdl_hook-ytdl_path={args.ytdlp}",
-        f"ytdl://ytsearch:{args.query}",
+        f"--script-opts=ytdl_hook-ytdl_path=\"{args.ytdlp}\"",
     ]
+    for q in queries:
+        cmd.append(f"ytdl://ytsearch:{q}")
 
     try:
         mpv_proc = subprocess.Popen(
@@ -206,6 +210,13 @@ def main():
                 if not line:
                     continue
                 low = line.lower()
+                
+                # Check for track changes
+                if "loading:" in low or "playing:" in low:
+                    if "ytdl://ytsearch:" in low:
+                        # Extract the query being loaded if possible, or just wait for title
+                        pass
+
                 if low.startswith("title:"):
                     t = line[6:].strip()
                     if t:
@@ -215,12 +226,11 @@ def main():
                 elif "audio:" in low or "ao:" in low:
                     if state["status"] == "loading":
                         state["status"] = "playing"
-                        if state["title"] == "Searching...":
-                            state["title"] = args.query
                         write_status()
                 elif "(exiting)" in low or "end of file" in low:
-                    state["status"] = "stopped"
-                    write_status()
+                    # Don't stop yet if there are more in the playlist
+                    # mpv handles the transition itself, we just need to detect title changes
+                    pass
         except Exception:
             pass
 
@@ -296,10 +306,20 @@ def main():
 
                     elif command == "next":
                         if mpv_proc.stdin:
+                            # mpv standard key for next is '>'
                             mpv_proc.stdin.write(b">")
                             mpv_proc.stdin.flush()
                         state["status"] = "loading"
                         state["title"] = "Loading next..."
+                        write_status()
+                    
+                    elif command == "prev":
+                        if mpv_proc.stdin:
+                            # mpv standard key for prev is '<'
+                            mpv_proc.stdin.write(b"<")
+                            mpv_proc.stdin.flush()
+                        state["status"] = "loading"
+                        state["title"] = "Loading previous..."
                         write_status()
 
         except Exception:

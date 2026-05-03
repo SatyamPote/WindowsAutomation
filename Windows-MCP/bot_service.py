@@ -26,12 +26,20 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
 DATA_DIR = os.path.join(PROGRAM_DATA, "Lotus")
 
-# Config is now in the app directory for easier manual access
-if getattr(sys, 'frozen', False):
-    CONFIG_FILE = os.path.join(os.path.dirname(sys.executable), "config.json")
-else:
-    CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+# ── Configuration Discovery ──
+def get_config_path():
+    candidates = []
+    if getattr(sys, 'frozen', False):
+        candidates.append(os.path.join(os.path.dirname(sys.executable), "config.json"))
+    candidates.append(os.path.join(BASE_DIR, "config.json"))
+    candidates.append(os.path.join(DATA_DIR, "config", "config.json"))
+    
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return candidates[0] # Default
 
+CONFIG_FILE = get_config_path()
 PID_FILE = os.path.join(DATA_DIR, "lotus_bot.pid")
 LOG_FILE = os.path.join(DATA_DIR, "logs", "bot_service.log")
 

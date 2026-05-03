@@ -28,6 +28,12 @@ class MusicPlayer:
         self._query = ""
         self._control_file = os.path.join(_THIS_DIR, ".player_control")
         self._status_file = os.path.join(_THIS_DIR, ".player_status")
+        # Ensure state is always a dict to prevent 'tuple' attribute errors
+        self.state = {
+            "process": None,
+            "queue": [],
+            "index": 0
+        }
 
     # ------------------------------------------------------------------
     # Dependency check
@@ -39,7 +45,6 @@ class MusicPlayer:
         bin_dir = get_lotus_bin_dir()
 
         if not self.mpv_path:
-            # Check both bin/mpv.exe and bin/mpv/mpv.exe (installer uses subfolder)
             candidates = [
                 os.path.join(bin_dir, "mpv.exe"),
                 os.path.join(bin_dir, "mpv", "mpv.exe")
@@ -83,6 +88,11 @@ class MusicPlayer:
         """Force-kill the TUI process and any orphaned TUI windows."""
         import psutil
         
+        # 0. Kill ALL mpv instances (Aggressive cleanup)
+        try:
+            os.system("taskkill /IM mpv.exe /F >nul 2>&1")
+        except: pass
+
         # 1. Kill the known process handle if it exists
         if self.process is not None:
             pid = self.process.pid
@@ -99,13 +109,11 @@ class MusicPlayer:
                 pass
         
         # 2. Aggressive Fallback: Scan all processes for 'player_tui.py'
-        # This handles cases where the bot restarted and lost the process handle.
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
             try:
                 cmdline = proc.info.get('cmdline') or []
                 if any('player_tui.py' in part for part in cmdline):
                     logger.info("Killing orphaned TUI process: %d", proc.info['pid'])
-                    # Kill children (mpv) first
                     try:
                         for child in proc.children(recursive=True):
                             child.kill()
@@ -116,16 +124,14 @@ class MusicPlayer:
                 continue
 
         self.process = None
+        self.state["process"] = None
 
     # ------------------------------------------------------------------
     # Playback
     # ------------------------------------------------------------------
     def play_song(self, query: str):
         if not self.check_dependencies():
-            return False, (
-                "❌ mpv or yt-dlp not installed.\n"
-                "Place `mpv.exe` and `yt-dlp.exe` in the `bin/` folder or add them to PATH."
-            )
+            return {"success": False, "message": "❌ mpv or yt-dlp missing in bin/ folder."}
 
         # Stop any existing playback
         self.stop()
@@ -134,7 +140,6 @@ class MusicPlayer:
         # Clear old files
         self._cleanup_files()
 
-        # Find python.exe (not pythonw.exe — we need a console)
         python_exe = sys.executable
         if "pythonw" in python_exe.lower():
             python_exe = python_exe.lower().replace("pythonw.exe", "python.exe")
@@ -142,12 +147,11 @@ class MusicPlayer:
                 python_exe = shutil.which("python") or shutil.which("python3") or "python"
 
         try:
-            # Determine command based on whether we are frozen or not
+            system_python = shutil.which("python") or shutil.which("python3") or "python"
+            
             if getattr(sys, 'frozen', False):
-                # When frozen, we call Lotus.exe with --player-tui flag
-                cmd = [sys.executable, "--player-tui"]
+                cmd = [system_python, _TUI_SCRIPT]
             else:
-                # When running from source, we use python.exe to run player_tui.py
                 cmd = [python_exe, _TUI_SCRIPT]
 
             cmd.extend([
@@ -158,76 +162,75 @@ class MusicPlayer:
                 "--status", self._status_file,
             ])
 
-            # CREATE_NEW_CONSOLE opens a VISIBLE new window AND lets us
-            # keep the process handle so we can kill it later with stop.
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 1 # SW_NORMAL
+            
             self.process = subprocess.Popen(
                 cmd,
                 cwd=_THIS_DIR,
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
+                startupinfo=si,
             )
+            self.state["process"] = self.process
             logger.info("Launched TUI player (PID %d) for: %s", self.process.pid, query)
 
-            return True, (
-                f"🎵 **Now Playing:** {query}\n"
-                f"🖥️ A music player window has opened on your desktop.\n\n"
-                f"**Controls:**\n"
-                f"• `pause` — Pause playback\n"
-                f"• `resume` — Resume playback\n"
-                f"• `stop` — Stop and close player\n"
-                f"• `volume up/down` — Adjust volume\n"
-                f"• `next` — Skip track"
-            )
+            return {"success": True, "message": f"🎵 **Playing:** {query}\nDesktop player window opened."}
 
         except Exception as e:
             logger.error("Failed to launch TUI player: %s", e)
-            return False, f"❌ Failed to open music player: {e}"
+            return {"success": False, "message": f"❌ Failed to open music player: {e}"}
 
     def pause(self):
         if self._is_tui_running():
             self._send_control("pause")
-            return True, "⏸ Music paused."
-        return False, "⚠️ No music is currently playing."
+            return {"success": True, "message": "⏸ Music paused."}
+        return {"success": False, "message": "⚠️ No music playing."}
 
     def resume(self):
         if self._is_tui_running():
             self._send_control("resume")
-            return True, "▶️ Resumed."
-        return False, "⚠️ No music is currently playing."
+            return {"success": True, "message": "▶️ Resumed."}
+        return {"success": False, "message": "⚠️ No music playing."}
 
     def stop(self):
         if self._is_tui_running():
-            # First try graceful quit via control file
             self._send_control("quit")
-            # Give TUI 2 seconds to shut down gracefully
             try:
                 self.process.wait(timeout=2)
             except Exception:
                 pass
 
-        # Final cleanup: kill any orphaned TUI windows and clean files
         self._kill_tui()
         self.process = None
+        self.state["process"] = None
         self._query = ""
         self._cleanup_files()
-        return True, "⏹ Music stopped. Player window closed."
+        return {"success": True, "message": "⏹ Music stopped. Player closed."}
 
     def volume_up(self):
         if self._is_tui_running():
             self._send_control("volume_up")
-            return True, "🔊 Volume increased."
-        return False, "⚠️ No music is currently playing."
+            return {"success": True, "message": "🔊 Volume up."}
+        return {"success": False, "message": "⚠️ No music playing."}
 
     def volume_down(self):
         if self._is_tui_running():
             self._send_control("volume_down")
-            return True, "🔉 Volume decreased."
-        return False, "⚠️ No music is currently playing."
+            return {"success": True, "message": "🔉 Volume down."}
+        return {"success": False, "message": "⚠️ No music playing."}
 
     def next_song(self):
         if self._is_tui_running():
             self._send_control("next")
-            return True, "⏭ Skipped to next track."
-        return False, "⚠️ No music is currently playing."
+            return {"success": True, "message": "⏭ Skipped to next track."}
+        return {"success": False, "message": "⚠️ No music playing."}
+
+    def previous_song(self):
+        if self._is_tui_running():
+            self._send_control("prev")
+            return {"success": True, "message": "⏮ Skipped to previous track."}
+        return {"success": False, "message": "⚠️ No music playing."}
 
 
 player = MusicPlayer()

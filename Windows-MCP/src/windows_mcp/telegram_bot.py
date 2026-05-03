@@ -31,26 +31,41 @@ from windows_mcp.contacts.contact_manager import get_contact, load_contacts, add
 from windows_mcp.desktop.powershell import PowerShellExecutor
 from windows_mcp.media.music_player import player as music_player
 from windows_mcp.media.downloader import download_manager
+from windows_mcp.media.playlist_manager import PlaylistManager
+from windows_mcp.media.voice_system import VoiceSystem
+from windows_mcp.research.research_engine import ResearchEngine
+from windows_mcp.filesystem.storage_manager import storage_manager
+from windows_mcp.tools.activity_logger import activity_logger
+from windows_mcp.paths import (
+    get_lotus_storage_dir, 
+    get_lotus_data_dir, 
+    get_lotus_log_dir
+)
 
+VERSION = "2.1.0-PROD"
+REPO_URL = "https://github.com/SatyamPote/Lotus"
 logger = logging.getLogger(__name__)
 
 # Directory Setup
-PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
-BASE_DIR = os.path.join(PROGRAM_DATA, "Lotus")
-LOG_DIR = os.path.join(BASE_DIR, "logs")
-STORAGE_DIR = os.path.join(BASE_DIR, "storage")
-DATA_DIR = os.path.join(BASE_DIR, "config") # Use config for persistence as per requirement
+STORAGE_DIR = get_lotus_storage_dir()
+DATA_DIR = get_lotus_data_dir()
+LOG_DIR = get_lotus_log_dir()
 
-STORAGE_FILES = os.path.join(STORAGE_DIR, "files")
-STORAGE_VIDEOS = os.path.join(STORAGE_DIR, "videos")
-STORAGE_IMAGES = os.path.join(STORAGE_DIR, "images")
-STORAGE_AUDIO = os.path.join(STORAGE_DIR, "audio")
-STORAGE_TEMP = os.path.join(STORAGE_DIR, "temp")
+STORAGE_FILES = STORAGE_DIR / "files"
+STORAGE_VIDEOS = STORAGE_DIR / "videos"
+STORAGE_IMAGES = STORAGE_DIR / "images"
+STORAGE_AUDIO = STORAGE_DIR / "audio"
+STORAGE_RESEARCH = STORAGE_DIR / "research"
+STORAGE_TEMP = STORAGE_DIR / "temp"
 
-for d in [LOG_DIR, STORAGE_DIR, DATA_DIR, STORAGE_FILES, STORAGE_VIDEOS, STORAGE_IMAGES, STORAGE_AUDIO, STORAGE_TEMP]:
-    os.makedirs(d, exist_ok=True)
-    # create .keep file
-    open(os.path.join(d, ".keep"), "w").close()
+for d in [STORAGE_FILES, STORAGE_VIDEOS, STORAGE_IMAGES, STORAGE_AUDIO, STORAGE_RESEARCH, STORAGE_TEMP]:
+    d.mkdir(parents=True, exist_ok=True)
+
+# Managers
+playlist_manager = PlaylistManager(DATA_DIR)
+voice_config_path = DATA_DIR / "voice_config.json"
+voice_system = VoiceSystem(str(STORAGE_AUDIO), str(voice_config_path))
+research_engine = ResearchEngine(str(STORAGE_DIR))
 
 # Persistence
 USER_FILE = os.path.join(DATA_DIR, "users.json")
@@ -150,20 +165,28 @@ TYPO_MAP = {
 }
 
 def clean_input(text: str) -> str:
-    # Fix merged words and spaces
-    text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+    """Clean input: remove fillers and handle typos."""
     t = text.strip().lower()
+    # Remove fillers requested by user
+    t = re.sub(r'\b(on|about|research)\b', '', t)
+    # Remove asterisks, slashes
+    t = re.sub(r'^[^a-z0-9]+', '', t)
     # Apply typo corrections
     for wrong, right in TYPO_MAP.items():
         t = t.replace(wrong, right)
-    # Remove conversational fillers
-    fillers = [
-        r'\bapplication\b', r'\baplication\b', r'\bsoftware\b',
-        r'\bcan you\b', r'\bplease\b', r'\bsong\b'
-    ]
-    for f in fillers:
-        t = re.sub(f, '', t)
     return t.strip()
+
+def log_error(cmd: str, err: Exception):
+    """Log errors with stack trace to logs/errors.log."""
+    import traceback
+    os.makedirs(LOG_DIR, exist_ok=True)
+    err_path = LOG_DIR / "errors.log"
+    timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]")
+    with open(err_path, "a", encoding="utf-8") as f:
+        f.write(f"{timestamp} COMMAND: {cmd}\n")
+        f.write(f"ERROR: {str(err)}\n")
+        f.write(traceback.format_exc())
+        f.write("-" * 50 + "\n")
 
 def clear_temp_cache(context: ContextTypes.DEFAULT_TYPE):
     """Clear memory and temporary mappings."""
@@ -396,7 +419,7 @@ async def process_task_queue(context: ContextTypes.DEFAULT_TYPE):
 
 def close_all_apps():
     """Safely close all user applications."""
-    system_procs = ["python.exe", "system", "registry", "smss.exe", "csrss.exe", "wininit.exe", "services.exe", "lsass.exe", "explorer.exe", "svchost.exe", "winlogon.exe"]
+    system_procs = ["lotus.exe", "python.exe", "pythonw.exe", "system", "registry", "smss.exe", "csrss.exe", "wininit.exe", "services.exe", "lsass.exe", "explorer.exe", "svchost.exe", "winlogon.exe"]
     closed_count = 0
     for p in psutil.process_iter(['name']):
         try:
@@ -425,10 +448,11 @@ async def execute_system_cmd(action: str) -> dict:
 
 CHAT_RESPONSES = {
     # greetings
-    r'\b(hi|hello|hey|sup|yo)\b': "Hey! 👋 I'm Lotus — your Windows AI. What do you need?",
+    r'\b(hi|hello|hey|sup|yo)\b': "Hey! 👋 I'm Lotus — your Windows AI assistant, built by *Satyam Pote*. What do you need?",
     r'\b(how are you|how r u|how are u)\b': "I'm running perfectly! 🚀 Ready to control your PC. What's the command?",
-    r'\b(what can you do|what do you do|capabilities|features)\b': "I can control your entire Windows PC! Open apps, play music, manage files, take screenshots, send WhatsApp messages, and much more. Type /help for full list.",
-    r'\b(who are you|what are you|your name)\b': "I'm *Lotus* 🖥️ — an AI that controls your Windows PC via Telegram. Built to execute your commands fast and reliably.",
+    r'\b(what can you do|what do you do|capabilities|features)\b': "I can control your entire Windows PC! Open apps, play music, manage files, take screenshots, send WhatsApp messages, run PowerShell, and much more. Type /help for full list.",
+    r'\b(who are you|what are you|your name)\b': "I'm *Lotus* 🌸 — an AI-powered Windows control agent created by *Satyam Pote*. I execute your commands on your PC via Telegram, fast and reliably.",
+    r'\b(who made you|who created you|who built you|who is your (creator|developer|maker|author|owner))\b': "I was created by *Satyam Pote* 🧑‍💻\n\n🔗 GitHub: [SatyamPote](https://github.com/SatyamPote)\n📧 Email: satyampote9999@gmail.com\n\nLotus is an open-source AI Windows control agent. 🌸",
     r'\b(thanks|thank you|thx|ty)\b': "You're welcome! 😊 Anything else?",
     r'\b(good|great|awesome|nice|cool|perfect|excellent)\b': "Glad it worked! 🎉 What's next?",
     r'\b(help me|i need help|assist me)\b': "Sure! Here's what I can do — type /help for the full command list.",
@@ -457,32 +481,52 @@ def _ollama_chat(text: str) -> str | None:
     """Fallback to local Ollama AI for real conversation."""
     try:
         import requests
-        # We try to find the model name from config or default to phi3
-        PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
-        config_path = os.path.join(PROGRAM_DATA, "Lotus", "config", "config.json")
-        model_name = "phi3" # Default
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, 'r') as f:
-                    model_name = json.load(f).get("model_name", "phi3")
-            except: pass
+        import sys as _sys
+        model_name = "phi3"  # Default
+        # Search for config.json in multiple locations
+        config_candidates = []
+        if getattr(_sys, 'frozen', False):
+            config_candidates.append(os.path.join(os.path.dirname(_sys.executable), "config.json"))
+        config_candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "config.json"))
+        PROGRAM_DATA_DIR = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
+        config_candidates.append(os.path.join(PROGRAM_DATA_DIR, "Lotus", "config", "config.json"))
+        for cp in config_candidates:
+            cp = os.path.normpath(cp)
+            if os.path.exists(cp):
+                try:
+                    with open(cp, 'r') as f:
+                        cfg = json.load(f)
+                    model_name = cfg.get("model") or cfg.get("model_name", "phi3")
+                    break
+                except Exception:
+                    pass
         
-        # Call Ollama API
+        # Call Ollama API with Lotus identity
+        system_prompt = (
+            "You are Lotus, a helpful Windows AI assistant created by Satyam Pote. "
+            "You control the user's Windows PC via Telegram. "
+            "Keep responses brief, friendly, and helpful. "
+            "If asked who made you or who your creator is, always say Satyam Pote. "
+            "Never claim to be made by OpenAI, Microsoft, Google, or any other company. "
+            "You are an independent open-source project."
+        )
         response = requests.post(
             "http://localhost:11434/api/generate",
             json={
                 "model": model_name,
-                "prompt": f"You are Lotus, a helpful Windows AI assistant. Keep your response brief and friendly. User says: {text}",
+                "prompt": f"{system_prompt}\n\nUser says: {text}",
                 "stream": False
             },
-            timeout=15
+            timeout=30
         )
         if response.status_code == 200:
-            return response.json().get("response")
+            reply = response.json().get("response", "").strip()
+            if reply:
+                return f"🤖 *AI ({model_name}):*\n{reply}"
     except Exception as e:
         logger.debug(f"Ollama chat fallback failed: {e}")
     
-    return "I'm a Windows automation bot. I can execute commands but can't answer general questions. Try /help to see what I can do!"
+    return "I'm Lotus 🌸, your Windows AI agent by Satyam Pote. I can execute commands but need Ollama running for AI chat. Try /help to see what I can do!"
 
 def find_file(query: str) -> list[str]:
     """
@@ -605,464 +649,90 @@ def _play_youtube(intent: str, query: str, encoded: str, url: str):
             import pyautogui; time.sleep(0.5); pyautogui.press('tab', presses=10, interval=0.05); pyautogui.press('enter')
 
 async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEFAULT_TYPE) -> dict:
-    """Strictly classified parser: Music > Apps > Msg > Files > Web."""
+    """STRICT PRIORITY ROUTER: System > File > Music > Research > AI Fallback."""
+    raw_text = text
     t = clean_input(text)
-    t_clean = t.replace("please", "").strip()
     first_word = t.split()[0] if t else ""
     
-    # ── PRIORITY 0: Shell-like Navigation ──
-    cwd = context.user_data.get("cwd", os.path.join(os.path.expanduser("~"), "Desktop"))
-    context.user_data["cwd"] = cwd
-    
-    if t in ["ls", "list"]:
-        logger.info(f"Intent: NAVIGATION (ls)")
-        try:
-            items = os.listdir(cwd)
-            if not items: return {"success": True, "message": f"📁 Folder is empty: `{cwd}`"}
-            folder_list = [f"📁 `{item}`" for item in items if os.path.isdir(os.path.join(cwd, item))]
-            file_list = [f"📄 `{item}`" for item in items if not os.path.isdir(os.path.join(cwd, item))]
-            resp = f"📍 *Current Path:* `{cwd}`\n\n" + "\n".join(folder_list[:20] + file_list[:20])
-            return {"success": True, "message": resp}
-        except Exception as e: return {"success": False, "message": f"Error: {e}"}
-
-    if t.startswith("cd "):
-        logger.info(f"Intent: NAVIGATION (cd)")
-        target = t[3:].strip()
-        new_path = os.path.dirname(cwd) if target == ".." else os.path.join(cwd, target)
-        if not os.path.exists(new_path):
-            for item in os.listdir(cwd):
-                if target.lower() in item.lower() and os.path.isdir(os.path.join(cwd, item)):
-                    new_path = os.path.join(cwd, item); break
-        if os.path.isdir(new_path):
-            context.user_data["cwd"] = os.path.abspath(new_path)
-            return {"success": True, "message": f"📂 Moved to: `{context.user_data['cwd']}`"}
-        return {"success": False, "message": f"Folder '{target}' not found."}
-
-    # ── PRIORITY 0b: Admin & System Commands ──
-    if text.strip() == "/admin":
-        return {"success": True, "message": "👤 *Owner Info*\n\nName: Satyam Pote\nEmail: satyampote9999@gmail.com\nGitHub: https://github.com/SatyamPote"}
-
-    if t == "restart bot":
-        logger.info("Restart requested via Telegram")
-        context.user_data["pending_confirm"] = {"action": "restart bot", "time": time.time()}
-        return {"success": True, "message": "⚠️ Are you sure you want to **restart the bot**?\nReply `yes` to confirm."}
-
-    if t == "update lotus":
-        logger.info("Update check requested")
-        try:
-            import requests as _req
-            r = _req.get("https://api.github.com/repos/SatyamPote/Lotus/releases/latest", timeout=5)
-            if r.status_code == 200:
-                data = r.json()
-                latest = data.get("tag_name", "unknown")
-                current = "v2.0"
-                if latest != current:
-                    url = data.get("html_url", "https://github.com/SatyamPote/Lotus/releases")
-                    return {"success": True, "message": f"🆕 *New version available!*\n\nLatest: `{latest}`\nCurrent: `{current}`\n\n[Download here]({url})"}
-                return {"success": True, "message": f"✅ You're on the latest version (`{current}`)."}
-            return {"success": False, "message": "⚠️ Could not reach GitHub. Check your internet."}
-        except Exception as e:
-            return {"success": False, "message": f"❌ Update check failed: {e}"}
-
-    if t == "show logs":
-        log_file = os.path.join(LOG_DIR, "activity_log.txt")
-        if os.path.exists(log_file):
-            return {"success": True, "message": f"__SEND_FILE__:{log_file}"}
-        return {"success": False, "message": "No logs found."}
-
-    if t == "clear logs":
-        log_file = os.path.join(LOG_DIR, "activity_log.txt")
-        try:
-            if os.path.exists(log_file): os.remove(log_file)
-            return {"success": True, "message": "Logs cleared."}
-        except Exception as e:
-            return {"success": False, "message": f"Failed to clear logs: {e}"}
-
-    if t == "storage status":
-        all_files = []
-        for root, _, fnames in os.walk(STORAGE_DIR):
-            for fn in fnames:
-                fp = os.path.join(root, fn)
-                if os.path.isfile(fp): all_files.append(fp)
-        total_size = sum(os.path.getsize(f) for f in all_files) / (1024*1024)
-        return {"success": True, "message": f"📦 *Storage Status*\n━━━━━━━━━\n📂 *Path:* `{STORAGE_DIR}`\n📊 *Size:* {total_size:.2f} MB / 2048 MB (2 GB)\n📁 *Files:* {len(all_files)}"}
-
-    # ── PRIORITY 1: Music Control ──
-    if first_word in ["play", "pause", "resume", "stop", "volume", "next"]:
-        logger.info(f"Intent: MUSIC ({first_word})")
-        if first_word == "play":
-            query = t[4:].strip()
-            if not query: return {"success": False, "message": "Play what? (e.g. `play happy nation`)"}
-            success, msg = music_player.play_song(query)
-            return {"success": success, "message": msg}
-        
-        music_cmds = {
-            "pause": music_player.pause, 
-            "resume": music_player.resume, 
-            "next": music_player.next_song, 
-            "stop": music_player.stop,
-            "volume up": music_player.volume_up,
-            "volume down": music_player.volume_down
-        }
-        cmd_key = t if t in music_cmds else first_word
-        if cmd_key in music_cmds:
-            success, msg = music_cmds[cmd_key]()
-            return {"success": success, "message": msg}
-
-    # ── PRIORITY 1b: Download Manager ──
-    if first_word == "download":
-        rest = t[8:].strip()
-        logger.info(f"Intent: DOWNLOAD ({rest[:30]})")
-
-        # YouTube download — extract the actual URL from the text
-        if rest.startswith("youtube ") or 'youtube.com' in rest or 'youtu.be' in rest or 'youtub ' in rest:
-            # Extract URL from the ORIGINAL text to preserve case-sensitive Video IDs!
-            orig_url_match = re.search(r'(https?://[^\s]+)', text)
-            if orig_url_match:
-                url = orig_url_match.group(1)
-            else:
-                # If no URL found, treat rest as search query minus "youtube "
-                query_str = rest.replace("youtube ", "").replace("youtub ", "").strip()
-                # Use ytsearch1: to tell yt-dlp to search and download the first result
-                url = f"ytsearch1:{query_str}"
-            
-            # Store pending download for quality selection
-            context.user_data["pending_download"] = {"type": "youtube", "url": url}
-            buttons = [
-                [InlineKeyboardButton("360p", callback_data="dl:360"),
-                 InlineKeyboardButton("720p", callback_data="dl:720"),
-                 InlineKeyboardButton("1080p", callback_data="dl:1080")],
-                [InlineKeyboardButton("🎵 Audio Only (MP3)", callback_data="dl:audio")],
-            ]
-            await update.message.reply_text(
-                f"🎬 *YouTube Download*\n\n🔗 `{url}`\n\nSelect quality:",
-                reply_markup=InlineKeyboardMarkup(buttons), parse_mode="Markdown"
-            )
-            return {"success": True, "message": "Select download quality above."}
-
-        # Image download
-        if rest.startswith("images "):
-            topic = rest[7:].strip()
-            if not topic:
-                return {"success": False, "message": "Download images of what? (e.g. `download images cars`)"}
-            success, msg = download_manager.download_images(topic)
-            return {"success": success, "message": msg}
-
-        # General URL download
-        if rest.startswith("http") or "://" in text:
-            orig_url_match = re.search(r'(https?://[^\s]+)', text)
-            url = orig_url_match.group(1) if orig_url_match else rest
-            success, msg = download_manager.download_url(url)
-            return {"success": success, "message": msg}
-
-        # Cancel
-        if rest == "cancel":
-            success, msg = download_manager.cancel()
-            return {"success": success, "message": msg}
-
-        return {"success": False, "message": "\n".join([
-            "📥 **Download Commands:**",
-            "• `download youtube <url>` — YouTube video/audio",
-            "• `download images <topic>` — Bulk image download",
-            "• `download <url>` — Direct file download",
-            "• `download cancel` — Cancel active download",
-        ])}
-
-    # ── PRIORITY 1c: TTS / Speak ──
-    if first_word == "speak":
-        speak_text = t[5:].strip()
-        if not speak_text:
-            return {"success": False, "message": "Speak what? (e.g. `speak hello world`)"}
-        logger.info("Intent: TTS")
-        try:
-            tts_dir = os.path.join(STORAGE_DIR, "tts")
-            os.makedirs(tts_dir, exist_ok=True)
-            tts_path = os.path.join(tts_dir, f"tts_{int(time.time())}.mp3")
-            import pyttsx3
-            engine = pyttsx3.init()
-            engine.save_to_file(speak_text, tts_path)
-            engine.runAndWait()
-            return {"success": True, "message": f"__SEND_FILE__:{tts_path}"}
-        except ImportError:
-            return {"success": False, "message": "⚠️ pyttsx3 not installed. Run: `pip install pyttsx3`"}
-        except Exception as e:
-            return {"success": False, "message": f"❌ TTS failed: {e}"}
-
-    # ── PRIORITY 2: App Control (openapp / closeapp / close) ──
-    if first_word in ["openapp", "startapp", "launchapp", "close"]:
-        logger.info(f"Intent: APP_CONTROL ({first_word})")
-        target = t[len(first_word):].strip()
-        
-        if first_word == "close":
-            if target == "all apps":
-                context.user_data["pending_confirm"] = {"action": "close all apps", "time": time.time()}
-                return {"success": True, "message": "⚠️ Are you sure you want to **close all apps**?\nReply `yes` within 10 seconds to confirm, or `no` to cancel."}
-            # Fuzzy match process name
-            target_proc = APP_MAPPING.get(target, target)
-            if not target_proc.endswith(".exe") and "." not in target_proc: target_proc += ".exe"
-            closed = False
-            for p in psutil.process_iter(['name']):
-                if p.info['name'] and target_proc.lower() in p.info['name'].lower():
-                    p.terminate(); closed = True
-            return {"success": closed, "message": f"{target.title()} closed" if closed else f"Could not find {target}"}
-
-        # Handle openapp (Known Apps/Settings)
-        if target in ["settings"]: subprocess.Popen("start ms-settings:", shell=True); return {"success": True, "message": "Opened Settings"}
-        mapped_app = APP_MAPPING.get(target, target)
-        if mapped_app.startswith("start "):
-            subprocess.Popen(mapped_app, shell=True); return {"success": True, "message": f"Opened {target}"}
-        
-        # Launch app (Only if it's a known app or has .exe)
-        if target in APP_MAPPING or target.endswith(".exe"):
-            res = launch_app(mapped_app)
-            if res.get("success"): return res
-        
-        # Fallback: try to find and launch
-        res = launch_app(mapped_app)
-        return res
-
-    # ── PRIORITY 3: Messaging (WhatsApp) ──
-    # WhatsApp Contact Management
-    if t.startswith("add contact"):
-        rest = t[11:].strip()
-        if ":" in rest:
-            name, phone = rest.split(":", 1)
-            res = add_contact(name.strip(), phone.strip())
-            return {"success": True, "message": res}
-        return {"success": False, "message": "Usage: `add contact Name : Number`"}
-
-    if t in ["my contacts", "show contacts", "view contacts", "list contacts"]:
-        return {"success": True, "message": format_contacts()}
-
-    # WhatsApp Messaging
-    send_match = re.search(r'^send\s+(.+?)\s+to\s+(.+?)$', t)
-    if send_match:
-        payload, name = send_match.group(1).strip(), send_match.group(2).strip()
-        contact = get_contact(name)
-        if contact: return send_message(contact['phone'], payload, is_file=os.path.isfile(payload))
-
-    # ── PRIORITY 4: File Operations (open / find) ──
-    file_extensions = ('.pdf', '.txt', '.docx', '.xlsx', '.png', '.jpg', '.mp3', '.mp4')
-    if any(ext in t for ext in file_extensions) or first_word in ["find", "open"]:
-        logger.info(f"Intent: FILE_OPS")
-        query = t[len(first_word):].strip() if first_word in ["find", "open"] else t
-        matches = find_file(query)
-        if matches:
-            context.user_data["last_files"] = matches
-            if len(matches) > 1:
-                file_map = context.user_data.get("file_map", {})
-                buttons = [[InlineKeyboardButton(f"{i+1}. {os.path.basename(p)}", callback_data=f"f:open:{str(uuid.uuid4())[:8]}")] for i, p in enumerate(matches[:10])]
-                for i, p in enumerate(matches[:10]): file_map[buttons[i][0].callback_data.split(":")[-1]] = p
-                context.user_data["file_map"] = file_map
-                await update.message.reply_text(f"🔍 Matches for '{query}':", reply_markup=InlineKeyboardMarkup(buttons))
-                return {"success": True, "message": "Select a file."}
-            os.startfile(matches[0]); return {"success": True, "message": f"Opened {os.path.basename(matches[0])}"}
-        if first_word == "open":
-            return {"success": False, "message": f"File '{query}' not found."}
-
-    # ── PRIORITY 5: Website Detection (Domains) ──
-    if first_word in ["openapp", "startapp", "launchapp"]:
-        target = t[len(first_word):].strip()
-        if re.match(r'^[a-z0-9\-]+\.(com|net|org|io|gov|edu|in|me|ai)$', target):
-            logger.info(f"Intent: WEBSITE")
-            import webbrowser; webbrowser.open(f"https://{target}"); return {"success": True, "message": f"Opened {target}"}
-
-    # ── PRIORITY 5b: System (with confirmation for dangerous commands) ──
-    if t in ["shutdown", "restart", "lock", "sleep"]:
-        logger.info(f"Intent: SYSTEM")
-        if t in DANGEROUS_COMMANDS:
-            context.user_data["pending_confirm"] = {"action": t, "time": time.time()}
-            return {"success": True, "message": f"\u26a0\ufe0f Are you sure you want to **{t}**?\nReply `yes` within 10 seconds to confirm, or `no` to cancel."}
+    # ── 1. SYSTEM COMMANDS ──
+    sys_cmds = ["shutdown", "restart", "lock", "sleep", "storage status", "clear storage", "show logs", "clear logs", "dashboard"]
+    if t in sys_cmds:
+        if t == "storage status":
+            status = storage_manager.get_status()
+            return {"success": True, "message": f"📦 *Storage Status*\nSize: {status['size_mb']:.2f} MB / {status['limit_mb']} MB"}
+        if t == "clear storage": return {"success": True, "message": storage_manager.clear_storage()}
+        if t == "show logs": return {"success": True, "message": f"📜 *Logs:*\n`{activity_logger.get_logs(10)}`"}
+        if t == "clear logs": return {"success": True, "message": activity_logger.clear_logs()}
+        if t == "dashboard":
+            stats = load_stats()
+            return {"success": True, "message": f"📊 *Lotus Dashboard*\nCommands: {stats.get('commands', 0)}\nApps: {stats.get('apps_opened', 0)}"}
         return await execute_system_cmd(t)
 
-    # ── PRIORITY 5c: Screenshot commands ──
-    if t in ["take screenshot", "screenshot"]:
-        return {"success": True, "message": "__SCREENSHOT__"}
-    if t in ["send screenshot"]:
-        return {"success": True, "message": "__SEND_SCREENSHOT__"}
+    # ── 2. FILE COMMANDS (open/send) ──
+    if first_word in ["open", "send", "find"]:
+        query = t.replace(first_word, "").strip()
+        if query:
+            # Search in storage, research, downloads
+            search_dirs = [STORAGE_DIR, STORAGE_RESEARCH, os.path.join(os.path.expanduser("~"), "Downloads")]
+            found_path = None
+            for d in search_dirs:
+                if not os.path.exists(d): continue
+                for root, _, files in os.walk(d):
+                    for f in files:
+                        if query in f.lower():
+                            found_path = os.path.join(root, f)
+                            break
+                    if found_path: break
+                if found_path: break
+            
+            if found_path:
+                if first_word == "open":
+                    os.startfile(found_path)
+                    return {"success": True, "message": f"📂 Opened: `{os.path.basename(found_path)}`"}
+                elif first_word == "send":
+                    return {"success": True, "message": f"__SEND_FILE__:{found_path}"}
+                else:
+                    return {"success": True, "message": f"📍 Found: `{found_path}`"}
+            
+            # General fallback search
+            if first_word == "find":
+                matches = find_file(query)
+                if matches:
+                    context.user_data["last_files"] = matches[:5]
+                    resp = "🔍 *Found matches:*\n" + "\n".join([f"{i+1}. `{os.path.basename(m)}`" for i, m in enumerate(matches[:5])])
+                    return {"success": True, "message": resp}
 
-    # ── PRIORITY 5d: System utilities ──
-    if t in ["show logs"]:
-        log_path = os.path.join(LOG_DIR, "activity_log.txt")
-        if not os.path.exists(log_path): return {"success": True, "message": "📂 No logs found."}
-        with open(log_path, 'r', encoding='utf-8') as f: lines = f.readlines()
-        recent = "".join(lines[-20:])
-        return {"success": True, "message": f"📜 *Recent Logs:*\n\n`{recent}`"}
-    if t in ["clear logs"]:
-        log_path = os.path.join(LOG_DIR, "activity_log.txt")
-        with open(log_path, 'w') as f: f.write("")
-        return {"success": True, "message": "✅ Logs cleared."}
-    if t in ["storage status"]:
-        all_files = []
-        for root, _, fnames in os.walk(STORAGE_DIR):
-            for fn in fnames:
-                fp = os.path.join(root, fn)
-                if os.path.isfile(fp): all_files.append(fp)
-        total_size = sum(os.path.getsize(f) for f in all_files) / (1024*1024)
-        return {"success": True, "message": f"\ud83d\udce6 *Storage:* {total_size:.2f} MB / 2048 MB (2 GB)\n\ud83d\udcc2 `{STORAGE_DIR}`"}
+    # ── 3. MUSIC COMMANDS ──
+    music_keywords = ["play", "pause", "resume", "stop", "next", "prev", "previous", "volume"]
+    if first_word in music_keywords or t in music_keywords:
+        if first_word == "play":
+            query = t[4:].strip()
+            if query: return music_player.play_song(query)
+        
+        music_map = {
+            "pause": music_player.pause, "resume": music_player.resume, "stop": music_player.stop,
+            "next": music_player.next_song, "prev": music_player.previous_song, "previous": music_player.previous_song,
+            "volume up": music_player.volume_up, "volume down": music_player.volume_down
+        }
+        if t in music_map: return music_map[t]()
+        if first_word in music_map: return music_map[first_word]()
 
-    # ── PRIORITY 6: Delete file ──
-    if first_word == "delete":
-        query = t[6:].strip()
-        if not query: return {"success": False, "message": "Delete what? (e.g. `delete report`)"}
-        matches = find_file(query)
-        if not matches: return {"success": False, "message": f"File '{query}' not found."}
-        context.user_data["last_files"] = matches
-        context.user_data["pending_delete"] = matches[0] if len(matches) == 1 else None
-        if len(matches) == 1:
-            return {"success": True, "message": f"⚠️ Confirm delete `{os.path.basename(matches[0])}`?\nReply `yes` to confirm."}
-        file_map = context.user_data.get("file_map", {})
-        buttons = [[InlineKeyboardButton(f"{i+1}. {os.path.basename(p)}", callback_data=f"f:delete:{str(uuid.uuid4())[:8]}")] for i, p in enumerate(matches[:10])]
-        for i, p in enumerate(matches[:10]): file_map[buttons[i][0].callback_data.split(":")[-1]] = p
-        context.user_data["file_map"] = file_map
-        await update.message.reply_text(f"🗑️ Which file to delete?", reply_markup=InlineKeyboardMarkup(buttons))
-        return {"success": True, "message": "Select a file to delete."}
+    # ── 4. RESEARCH / DOWNLOAD ──
+    if first_word == "research":
+        topic = t.replace("research", "").strip()
+        if topic: return {"success": True, "message": f"__RESEARCH__:{topic}"}
+    
+    if first_word == "download":
+        query = t[9:].strip()
+        if "youtube.com" in query or "youtu.be" in query:
+            return {"success": True, "message": f"📥 Download queued: {query}"}
 
-    # ── PRIORITY 6b: Send file via Telegram ──
-    if first_word == "send" and " to " not in t:
-        query = t[4:].strip()
-        if not query: return {"success": False, "message": "Send what? (e.g. `send report`)"}
-        matches = find_file(query)
-        if matches:
-            context.user_data["last_files"] = matches
-            if len(matches) == 1:
-                return {"success": True, "message": f"__SEND_FILE__:{matches[0]}"}
-            file_map = context.user_data.get("file_map", {})
-            buttons = [[InlineKeyboardButton(f"{i+1}. {os.path.basename(p)}", callback_data=f"f:send:{str(uuid.uuid4())[:8]}")] for i, p in enumerate(matches[:10])]
-            for i, p in enumerate(matches[:10]): file_map[buttons[i][0].callback_data.split(":")[-1]] = p
-            context.user_data["file_map"] = file_map
-            await update.message.reply_text(f"📤 Which file to send?", reply_markup=InlineKeyboardMarkup(buttons))
-            return {"success": True, "message": "Select a file to send."}
-        return {"success": False, "message": f"File '{query}' not found."}
-
-    # ── PRIORITY 7: Web Search (ONLY "search <query>") ──
-    if first_word == "search":
-        q = t[6:].strip()
-        if not q: return {"success": False, "message": "Search what? (e.g. `search AI tools`)"}
-        logger.info(f"Intent: WEB_SEARCH")
-        import urllib.parse; encoded = urllib.parse.quote(q)
-        import webbrowser; await asyncio.to_thread(webbrowser.open, f"https://www.google.com/search?q={encoded}")
-        resp = f"🌐 Searching '{q}' on Google"
-        log_activity(text, resp)
-        return {"success": True, "message": resp}
-
-    # ── PRIORITY 8: Result Memory (open 1, send 2) ──
-    if t.split()[0] in ["open", "send"] and len(t.split()) == 2 and t.split()[1].isdigit():
-        idx = int(t.split()[1]) - 1
-        last_files = context.user_data.get("last_files", [])
-        if 0 <= idx < len(last_files):
-            path = last_files[idx]
-            if first_word == "open":
-                os.startfile(path); return {"success": True, "message": f"Opened {os.path.basename(path)}"}
-            else:
-                return {"success": True, "message": f"__SEND_FILE__:{path}"}
-        return {"success": False, "message": f"No file at index {idx+1}. Use `find` first."}
-
-    # ── PRIORITY 9: Dashboard ──
-    if t == "dashboard":
-        stats = load_stats()
-        cmd_count = stats.get("commands", 0)
-        apps_opened = stats.get("apps_opened", 0)
-        counts = stats.get("command_counts", {})
-        top_cmd = max(counts, key=counts.get) if counts else "—"
-        top_count = counts.get(top_cmd, 0) if counts else 0
-        # Storage
-        total_sz = 0
-        for root, _, fnames in os.walk(STORAGE_DIR):
-            for fn in fnames:
-                fp = os.path.join(root, fn)
-                if os.path.isfile(fp):
-                    total_sz += os.path.getsize(fp)
-        sz_mb = total_sz / (1024 * 1024)
-        # Battery
-        batt = psutil.sensors_battery()
-        batt_str = f"{batt.percent}% {'🔌' if batt.power_plugged else '🔋'}" if batt else "N/A"
-        msg = (
-            f"📊 *Lotus Dashboard*\n"
-            f"━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"📅 Date: {stats.get('date', 'today')}\n"
-            f"⚡ Commands: {cmd_count}\n"
-            f"🏆 Top: `{top_cmd}` ({top_count}x)\n"
-            f"🖥️ Apps Opened: {apps_opened}\n"
-            f"📦 Storage: {sz_mb:.1f} MB / 2048 MB\n"
-            f"🔋 Battery: {batt_str}"
-        )
-        return {"success": True, "message": msg}
-
-    # ── PRIORITY 10: Command Memory ──
-    # set <name> = <commands>
-    set_match = re.match(r'^set\s+(\w+)\s*=\s*(.+)$', t)
-    if set_match:
-        name = set_match.group(1).lower()
-        actions = set_match.group(2).strip()
-        mem = load_memory()
-        mem[name] = actions
-        save_memory(mem)
-        return {"success": True, "message": f"✅ Saved: `{name}` → `{actions}`\n\nType `{name}` to run it."}
-
-    if t == "memory list" or t == "my commands":
-        mem = load_memory()
-        if not mem:
-            return {"success": True, "message": "📝 No saved commands.\n\nUse: `set study = open chrome + open vscode`"}
-        lines = [f"📝 *Saved Commands:*\n"]
-        for k, v in mem.items():
-            lines.append(f"• `{k}` → `{v}`")
-        return {"success": True, "message": "\n".join(lines)}
-
-    if t.startswith("forget ") or t.startswith("unset "):
-        name = t.split(maxsplit=1)[1].strip().lower()
-        mem = load_memory()
-        if name in mem:
-            del mem[name]
-            save_memory(mem)
-            return {"success": True, "message": f"🗑️ Removed: `{name}`"}
-        return {"success": False, "message": f"No command `{name}` found."}
-
-    # Memory recall — check if input matches a saved command name
-    mem = load_memory()
-    if t in mem:
-        logger.info(f"Intent: MEMORY_RECALL ({t})")
-        # Execute saved commands (split by + or and)
-        actions = re.split(r'\s*(?:\+|and|then)\s*', mem[t])
-        results = []
-        for action in actions[:5]:
-            action = action.strip()
-            if action:
-                res = await parse_and_execute(action, update, context)
-                results.append(f"• {res.get('message', '?')}")
-        return {"success": True, "message": f"🔄 Running `{t}`:\n" + "\n".join(results)}
-
-    # ── PRIORITY 11: Clipboard System ──
-    if t == "clipboard":
-        if not clipboard_history:
-            return {"success": True, "message": "📋 Clipboard is empty."}
-        lines = ["📋 *Last Copied Items:*\n"]
-        for i, item in enumerate(clipboard_history):
-            # truncate long items
-            disp = item if len(item) < 100 else item[:97] + "..."
-            lines.append(f"{i+1}. `{disp}`")
-        return {"success": True, "message": "\n".join(lines)}
-
-    if t == "clear clipboard":
-        clipboard_history.clear()
-        return {"success": True, "message": "✅ Clipboard history cleared."}
-
-    if t.startswith("copy "):
-        payload = t[5:].strip()
-        if not payload:
-            return {"success": False, "message": "Copy what? (e.g. `copy hello`)"}
-        import pyperclip
-        pyperclip.copy(payload)
-        return {"success": True, "message": f"📋 Copied to PC clipboard:\n`{payload}`"}
-
-    # ── PRIORITY 12: Conversational Chat ──
-    chat_resp = _chat_reply(text)
+    # ── 5. AI FALLBACK ──
+    chat_resp = _chat_reply(raw_text)
     if chat_resp:
         return {"success": True, "message": chat_resp}
 
-    # ── FINAL: Error — DO NOT open browser ──
-    logger.info(f"Intent: UNRECOGNIZED — '{t}'")
-    return {"success": False, "message": "❓ I didn't understand that.\nUse /help to see available commands."}
+    return {"success": False, "message": "❓ Command unrecognized. Try `/help`."}
 
 # ---------------------------------------------------------------------------
 # Command Handlers
@@ -1092,7 +762,47 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 @require_auth
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await cmd_start(update, context)
+    help_text = (
+        "🌸 *Lotus AI — Full Guide*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🛠️ *Basic Controls*\n"
+        "• `/start` — Quick dashboard\n"
+        "• `/help` — Show this guide\n"
+        "• `/version` — Check for updates\n"
+        "• `/status` — View PC health\n\n"
+        "🎵 *Media & Playlists*\n"
+        "• `play <song>` — Play music\n"
+        "• `pause` / `resume` / `stop` / `next`\n"
+        "• `volume <0-100>`\n"
+        "• `create playlist <name>`\n"
+        "• `delete playlist <name>`\n"
+        "• `play playlist <name>`\n"
+        "• `add to playlist <name> <song>`\n\n"
+        "🗣️ *Voice Feedback*\n"
+        "• `voice on` / `voice off` — Toggle voice\n"
+        "• `stop voice` — Kill local audio\n"
+        "• `voice style female` — Sweet female tone\n"
+        "• `voice auto on/off` — Auto replies\n"
+        "• `say <text>` — Talk via PC speakers\n\n"
+        "🖥️ *System & Tools*\n"
+        "• `record screen <seconds>` — Captures MP4\n"
+        "• `take screenshot` — Full desktop view\n"
+        "• `lock pc` / `sleep pc` / `shutdown`\n"
+        "• `open <app>` (e.g., Chrome, VS Code)\n"
+        "• `close <app>` — Terminate process\n\n"
+        "📁 *File Management*\n"
+        "• `find <name>` — Search PC files\n"
+        "• `send <name>` — Get file on Telegram\n"
+        "• `compress <name>` — ZIP file/folder\n"
+        "• `delete <name>` — Remove from PC\n\n"
+        "💬 *Automation*\n"
+        "• `research <topic>` — Advanced search\n"
+        "• `send msg to <contact> <text>` — WhatsApp\n"
+        "• `set <name> = <cmds>` — Create macros\n\n"
+        "👤 *Developer:* Satyam Pote\n"
+        "Type any command naturally. Lotus will understand!"
+    )
+    await update.message.reply_text(help_text, parse_mode="Markdown")
 
 @require_auth
 async def cmd_add_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1227,183 +937,53 @@ async def cmd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 @require_auth
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global COMMAND_COUNTER
     text = update.message.text
     if not text: return
-    user_id = str(update.effective_user.id)
-    msg_id = update.message.message_id
-    if msg_id in RECENT_COMMANDS: return
-    RECENT_COMMANDS[msg_id] = True
     
-    # User Store & Greeting logic
-    users = load_users()
-    now = time.time()
-    greeting = ""
-    
-    if user_id not in users:
-        users[user_id] = {"name": update.effective_user.first_name, "last_seen": now}
-        save_user(user_id, users[user_id])
-        greeting = f"👋 Hello {users[user_id]['name']}, welcome! How can I help you today?\n\n"
-    else:
-        last_seen = users[user_id].get("last_seen", 0)
-        time_diff = now - last_seen
-        if time_diff > 12 * 3600:
-            greeting = f"🏠 Welcome back {users[user_id]['name']}, how can I help you today?\n\n"
-        elif time.strftime("%d", time.localtime(last_seen)) != time.strftime("%d", time.localtime(now)):
-            h = int(time.strftime("%H"))
-            period = "Morning" if h < 12 else "Afternoon" if h < 18 else "Evening"
-            greeting = f"🌅 Good {period} {users[user_id]['name']}!\n\n"
-        users[user_id]["last_seen"] = now
-        save_user(user_id, users[user_id])
-
-    global COMMAND_COUNTER
-    COMMAND_COUNTER += 1
-    track_command(text)
-    
-    if COMMAND_COUNTER >= 3:
-        clear_temp_cache(context)
-        cleanup_storage()
-        import gc
-        gc.collect()
-        COMMAND_COUNTER = 0
-
-    # Confirmation handler (yes/no for dangerous commands + delete)
-    answer = text.strip().lower()
-    if answer in ["yes", "no"]:
-        # Dangerous command confirmation (shutdown/restart/close all)
-        pending_confirm = context.user_data.get("pending_confirm")
-        if pending_confirm:
-            context.user_data.pop("pending_confirm")
-            if answer == "no":
-                await update.message.reply_text("❌ Cancelled.")
-                return
-            elapsed = time.time() - pending_confirm.get("time", 0)
-            if elapsed > CONFIRM_TIMEOUT:
-                await update.message.reply_text("⏰ Confirmation timed out. Please send the command again.")
-                return
-            action = pending_confirm["action"]
-            if action == "close all apps":
-                await update.message.reply_text(close_all_apps())
-            elif action == "restart bot":
-                await update.message.reply_text("♻️ Restarting bot service...")
-                import threading as _threading
-                def _do_restart():
-                    import time as _t, os as _os, sys as _sys, subprocess as _sp
-                    _t.sleep(1)
-                    # re-launch this process then exit current
-                    PROGRAM_DATA = _os.environ.get("PROGRAMDATA", "C:\\ProgramData")
-                    pid_file = _os.path.join(PROGRAM_DATA, "Lotus", "lotus_bot.pid")
-                    try:
-                        if _os.path.exists(pid_file): _os.remove(pid_file)
-                    except: pass
-                    _os.execv(_sys.executable, [_sys.executable] + _sys.argv)
-                _threading.Thread(target=_do_restart, daemon=True).start()
-            else:
-                res = await execute_system_cmd(action)
-                await update.message.reply_text(f"✅ {res.get('message', 'Done')}")
-            return
-
-        # Delete confirmation
-        if answer == "yes" and context.user_data.get("pending_delete"):
-            path = context.user_data.pop("pending_delete")
-            try:
-                os.remove(path)
-                await update.message.reply_text(f"✅ Deleted: `{os.path.basename(path)}`", parse_mode="Markdown")
-            except Exception as e:
-                await update.message.reply_text(f"❌ Failed to delete: {e}")
-            return
+    # Standard Frame
+    FRAME_TOP = "━━━━━━━━━━━━━━━━━━━━\n📖 *Lotus Response*\n━━━━━━━━━━━━━━━━━━━━\n"
+    FRAME_BTM = "\n━━━━━━━━━━━━━━━━━━━━"
 
     processing_msg = await update.message.reply_text("⏳ Processing...")
     try:
-        async with asyncio.timeout(120.0):
-            # Multi-command support: split on " and " or " then "
-            sub_commands = re.split(r'\s+and\s+|\s+then\s+', text, flags=re.IGNORECASE)
-            sub_commands = [s.strip() for s in sub_commands if s.strip()]
-
-            if len(sub_commands) > 1:
-                # Add to task queue sequentially
-                for sub_cmd in sub_commands[:5]:
-                    await TASK_QUEUE.put({"text": sub_cmd, "update": update})
-                await processing_msg.edit_text(f"{greeting}⏳ Added {len(sub_commands[:5])} commands to queue.")
-                asyncio.create_task(process_task_queue(context))
-                log_activity(text, f"Multi-command queued: {len(sub_commands)} commands")
-                return
-
+        async with asyncio.timeout(180.0):
             res = await parse_and_execute(text, update, context)
             msg = res.get("message", "Done")
-            icon = "✅" if res.get("success") else "❌"
-            if res.get("success"):
-                if "Playing" in msg or "Opened" in msg or "Download" in msg:
-                    icon = "🎵" if "Play" in msg else ("📥" if "Download" in msg else "📁")
-            
-            # For direct commands, update the processing message
-            if res.get("success") and not msg.startswith("__"):
-                await processing_msg.edit_text(f"{greeting}{icon} {msg}")
-            elif not res.get("success"):
-                await processing_msg.edit_text(f"{icon} {msg}")
+            success = res.get("success", False)
 
-            # Handle special signals
-            if msg == "__SCREENSHOT__":
-                img, path = _take_screenshot()
-                with open(path, 'rb') as f:
-                    await update.message.reply_photo(photo=f, caption="🖥️ Screenshot captured.")
-                await processing_msg.delete()
-                log_activity(text, "Captured screenshot")
-                return
-
-            if msg == "__SEND_SCREENSHOT__":
-                ss_files = sorted(
-                    [os.path.join(STORAGE_DIR, f) for f in os.listdir(STORAGE_DIR) if f.startswith("ss_")],
-                    key=os.path.getmtime, reverse=True
-                )
-                if not ss_files:
-                    img, path = _take_screenshot()
+            # Special Signal Handling
+            if msg.startswith("__RESEARCH__:"):
+                topic = msg.split(":", 1)[1]
+                await processing_msg.edit_text(f"🔍 Researching *{topic}*...")
+                result = await asyncio.to_thread(research_engine.perform_research, topic)
+                if result["success"]:
+                    for img in result["images"][:3]:
+                        try:
+                            with open(img, 'rb') as f: await update.message.reply_photo(f)
+                        except: pass
+                    with open(result["pdf"], 'rb') as f:
+                        await update.message.reply_document(f, caption=f"📄 Report: {topic}")
+                    await processing_msg.edit_text(f"{FRAME_TOP}✅ Research Complete: {topic}{FRAME_BTM}", parse_mode="Markdown")
                 else:
-                    path = ss_files[0]
-                with open(path, 'rb') as f:
-                    await update.message.reply_document(document=f, caption="📸 Screenshot")
-                await processing_msg.delete()
-                log_activity(text, "Sent screenshot")
+                    await processing_msg.edit_text(f"{FRAME_TOP}❌ Research Failed: {topic}{FRAME_BTM}", parse_mode="Markdown")
                 return
 
             if msg.startswith("__SEND_FILE__:"):
-                fpath = msg.split(":", 1)[1]
-                fname = os.path.basename(fpath)
-                size_mb = os.path.getsize(fpath) / (1024 * 1024)
-                if size_mb > 50:
-                    await processing_msg.edit_text(f"❌ File too large ({size_mb:.1f}MB). Telegram limit is 50MB.")
-                    return
-                with open(fpath, 'rb') as f:
-                    await update.message.reply_document(
-                        document=f, caption=f"📄 {fname}",
-                        read_timeout=300, write_timeout=300, connect_timeout=300, pool_timeout=300
-                    )
-                await processing_msg.edit_text(f"✅ Sent: {fname}")
-                log_activity(text, f"Sent file: {fname}")
+                path = msg.split(":", 1)[1]
+                with open(path, 'rb') as f:
+                    await update.message.reply_document(f, caption=f"📄 {os.path.basename(path)}")
+                await processing_msg.delete()
                 return
 
-            icon = "✅" if res.get("success") else "❌"
-            if res.get("success"):
-                if "Playing" in msg or "play" in msg.lower(): icon = "🎵"
-                elif "Opened" in msg or "open" in msg.lower(): icon = "✅"
-                elif "Download" in msg: icon = "📥"
-                elif "Sent" in msg: icon = "📁"
-            resp_text = f"{icon} {msg}"
-            final_resp = f"{greeting}{resp_text}"
-            try:
-                await processing_msg.edit_text(final_resp, parse_mode="Markdown" if (greeting or res.get("success")) else None)
-            except Exception as e:
-                if "Message is not modified" not in str(e):
-                    raise e
-            log_activity(text, resp_text)
+            # Final response
+            icon = "✅" if success else "❌"
+            if "play" in msg.lower(): icon = "🎵"
             
-            COMMAND_COUNTER += 1
-            if COMMAND_COUNTER % 3 == 0:
-                cleanup_storage()
+            await processing_msg.edit_text(f"{FRAME_TOP}{icon} {msg}{FRAME_BTM}", parse_mode="Markdown")
+            
     except Exception as e:
-        if "Message is not modified" not in str(e):
-            logger.error(f"Error: {e}", exc_info=True)
-            await processing_msg.edit_text(f"❌ Error: {str(e)}")
+        log_error(text, e)
+        await processing_msg.edit_text(f"{FRAME_TOP}❌ Critical Error occurred. Check logs.{FRAME_BTM}", parse_mode="Markdown")
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log the error and send a telegram message to notify the developer."""
@@ -1478,10 +1058,31 @@ def run_bot(token: str = None) -> None:
     from telegram.request import HTTPXRequest
     request = HTTPXRequest(read_timeout=300, write_timeout=300, connect_timeout=300)
     
-    app = ApplicationBuilder().token(token).request(request).build()
+    async def post_init(application):
+        from telegram import BotCommand
+        bot_cmds = [
+            BotCommand("start", "Show dashboard"),
+            BotCommand("help", "Show all commands"),
+            BotCommand("version", "Check for updates"),
+            BotCommand("playlist", "List music playlists"),
+            BotCommand("voice", "Voice Control: on/off/stop"),
+            BotCommand("status", "View PC hardware status"),
+            BotCommand("contacts", "List WhatsApp contacts"),
+            BotCommand("storage", "Check storage usage"),
+            BotCommand("admin", "Creator details")
+        ]
+        try:
+            await application.bot.set_my_commands(bot_cmds)
+            logger.info("✅ Telegram bot commands menu updated.")
+        except Exception as e:
+            logger.error(f"Failed to set bot commands: {e}")
+
+    app = ApplicationBuilder().token(token).request(request).post_init(post_init).build()
     
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("version", lambda u, c: handle_message(u, c)))
+    app.add_handler(CommandHandler("playlist", lambda u, c: handle_message(u, c)))
     app.add_handler(CommandHandler("add", cmd_add_contact))
     app.add_handler(CommandHandler("contacts", cmd_contacts))
     app.add_handler(CommandHandler("owner", cmd_owner))

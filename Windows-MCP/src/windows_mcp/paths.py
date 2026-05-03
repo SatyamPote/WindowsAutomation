@@ -149,3 +149,27 @@ def get_lotus_bin_dir() -> Path:
 
     # Absolute fallback — return the standard install path
     return Path(r"C:\Program Files (x86)\Lotus\bin")
+
+
+def get_lotus_storage_dir() -> Path:
+    """Return the global storage directory in ProgramData."""
+    program_data = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    base = Path(program_data) / "Lotus" / "storage"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def get_lotus_data_dir() -> Path:
+    """Return the global data directory in ProgramData."""
+    program_data = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    base = Path(program_data) / "Lotus" / "data"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def get_lotus_log_dir() -> Path:
+    """Return the global logs directory in ProgramData."""
+    program_data = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    base = Path(program_data) / "Lotus" / "logs"
+    base.mkdir(parents=True, exist_ok=True)
+    return base

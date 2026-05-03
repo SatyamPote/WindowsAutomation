@@ -1,6 +1,11 @@
 from typing import Dict, Any, TypeVar, Callable, Protocol, Awaitable
 from tempfile import TemporaryDirectory
-from uuid_extensions import uuid7str
+try:
+    from uuid_extensions import uuid7str
+except ImportError:
+    import uuid
+    def uuid7str():
+        return str(uuid.uuid4())
 from fastmcp import Context
 from functools import wraps
 from pathlib import Path
