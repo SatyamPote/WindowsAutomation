@@ -6,17 +6,23 @@
     <key>Label</key>
     <string>com.lotus.botservice</string>
 
+    <!-- Filled in by install.sh -->
     <key>ProgramArguments</key>
     <array>
         <string>PYTHON_EXECUTABLE</string>
         <string>BOT_SERVICE_PATH</string>
     </array>
 
+    <!-- Auto-start at login. The Lotus app toggles this via launchctl. -->
     <key>RunAtLoad</key>
     <true/>
 
+    <!-- Lotus app handles restart logic; launchd should not auto-restart. -->
     <key>KeepAlive</key>
     <false/>
+
+    <key>WorkingDirectory</key>
+    <string>WORKING_DIR</string>
 
     <key>StandardOutPath</key>
     <string>LOG_PATH</string>
@@ -24,13 +30,15 @@
     <key>StandardErrorPath</key>
     <string>LOG_PATH</string>
 
-    <key>WorkingDirectory</key>
-    <string>WORKING_DIR</string>
-
     <key>EnvironmentVariables</key>
     <dict>
         <key>ANONYMIZED_TELEMETRY</key>
         <string>true</string>
+
+        <!-- Port for the local HTTP control API used by the Lotus macOS app.
+             Change this only if 40510 conflicts with another service. -->
+        <key>LOTUS_CONTROL_PORT</key>
+        <string>40510</string>
     </dict>
 </dict>
 </plist>

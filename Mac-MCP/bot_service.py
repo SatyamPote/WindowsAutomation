@@ -107,21 +107,32 @@ def run_service() -> None:
     config = load_config()
     token = (config or {}).get("telegram_token") or (config or {}).get("bot_token", "")
     if not token:
-        _log.error("No token in config.json — run app.py first.")
+        _log.error("No token in config.json — run the Lotus app first.")
         sys.exit(1)
 
     write_pid()
 
+    # sys.path must be set before importing mac_mcp modules
+    if str(SRC_DIR) not in sys.path:
+        sys.path.insert(0, str(SRC_DIR))
+
+    # Start the control API in a background thread so the Swift app can reach us
+    from mac_mcp import control_api
+    control_api.start(
+        config_file=CONFIG_FILE,
+        log_file=LOG_FILE,
+        port_file=APP_DATA_DIR / "control.port",
+        port=int(os.environ.get("LOTUS_CONTROL_PORT", "40510")),
+    )
+
     def _cleanup(signum=None, frame=None):
         _log.info("Signal %s received — shutting down", signum)
+        control_api.stop()
         remove_pid()
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, _cleanup)
     signal.signal(signal.SIGINT, _cleanup)
-
-    if str(SRC_DIR) not in sys.path:
-        sys.path.insert(0, str(SRC_DIR))
 
     # Set env vars from config so telegram_bot picks them up
     os.environ["TELEGRAM_BOT_TOKEN"] = token
@@ -140,6 +151,7 @@ def run_service() -> None:
         try:
             _log.info("Starting bot (attempt %d/%d)…", attempt, max_retries)
             from mac_mcp.telegram_bot import run_bot
+            control_api.set_telegram_started(True, model=model)
             run_bot(token=token)
             _log.info("Bot stopped normally.")
             break
@@ -151,6 +163,7 @@ def run_service() -> None:
             break
         except Exception as e:
             _log.exception("Bot crashed (attempt %d/%d): %s", attempt, max_retries, e)
+            control_api.set_telegram_started(False)
             if attempt < max_retries:
                 _log.info("Restarting in %ds…", retry_delay)
                 time.sleep(retry_delay)
@@ -158,6 +171,7 @@ def run_service() -> None:
             else:
                 _log.error("Max retries reached — giving up.")
 
+    control_api.stop()
     remove_pid()
     _log.info("=== Lotus Bot Service stopped ===")
 
