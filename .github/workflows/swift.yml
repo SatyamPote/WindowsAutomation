@@ -82,8 +82,9 @@ jobs:
       - name: Stamp version into build scripts
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          /usr/bin/sed -i '' "s/^VERSION=\"1.0.0\"/VERSION=\"$VERSION\"/" \
+          /usr/bin/sed -i '' -E "s/^VERSION=\".*\"/VERSION=\"$VERSION\"/" \
             ControlPanel/make_app.sh ControlPanel/make_dmg.sh
+          grep '^VERSION=' ControlPanel/make_app.sh ControlPanel/make_dmg.sh
 
       - name: Build Lotus.app
         run: bash ControlPanel/make_app.sh

@@ -64,11 +64,11 @@ final class InstallManager: ObservableObject {
 
     // MARK: - Quick check (synchronous)
 
-    /// True when the Python venv with all deps is already present.
+    /// True when the Python venv with all deps is already present in the
+    /// writable runtime dir (or in the dev source tree).
     var envIsReady: Bool {
-        let venv = AppConfig.botScriptDir.appendingPathComponent(".venv/bin/python")
-        if FileManager.default.fileExists(atPath: venv.path) { return true }
-        // Dev fallback: venv in the Mac-MCP source tree
+        let runtimeVenv = AppConfig.runtimeDir.appendingPathComponent(".venv/bin/python")
+        if FileManager.default.fileExists(atPath: runtimeVenv.path) { return true }
         let devVenv = AppConfig._devBaseDir.appendingPathComponent(".venv/bin/python")
         return FileManager.default.fileExists(atPath: devVenv.path)
     }
@@ -84,13 +84,20 @@ final class InstallManager: ObservableObject {
         logLines = []
 
         // Capture sendable values up-front (no actor-hopping inside closures)
-        let home      = NSHomeDirectory()
-        let scriptDir = AppConfig.botScriptDir
+        let home       = NSHomeDirectory()
+        let runtimeDir = AppConfig.runtimeDir
+        let bundledUV  = AppConfig.bundledUVPath?.path
+        let template   = AppConfig.bundledRuntimeTemplate
 
         // ── Step 1: uv ────────────────────────────────────────────────────
+        // Prefer the bundled uv binary that ships inside Lotus.app.
+        // Fall back to system uv (dev mode), and only as a last resort
+        // download via curl.
         await run(step: .uv) {
+            if let bundled = bundledUV, FileManager.default.isExecutableFile(atPath: bundled) {
+                return .skipped
+            }
             if ProcessRunner.findUV(home: home) != nil { return .skipped }
-            log("  Downloading uv installer…")
             let r = ProcessRunner.exec(
                 ["/bin/sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"],
                 env: ProcessRunner.enrichedPATH(home: home),
@@ -102,14 +109,13 @@ final class InstallManager: ObservableObject {
             return .done
         }
 
-        let uvPath = ProcessRunner.findUV(home: home)
+        let uvPath: String? = bundledUV ?? ProcessRunner.findUV(home: home)
 
         // ── Step 2: Python 3.13 ───────────────────────────────────────────
         await run(step: .python) {
             guard let uv = uvPath else { throw InstallError("uv not found — restart and retry") }
             let check = ProcessRunner.exec([uv, "python", "find", "3.13"], timeout: 8)
             if check.exitCode == 0 { return .skipped }
-            log("  Downloading Python 3.13…")
             let r = ProcessRunner.exec([uv, "python", "install", "3.13"],
                                        env: ProcessRunner.enrichedPATH(home: home), timeout: 300)
             if r.exitCode != 0 {
@@ -119,13 +125,32 @@ final class InstallManager: ObservableObject {
         }
 
         // ── Step 3: Bot dependencies ──────────────────────────────────────
+        // Stage bundled runtime template into the writable runtime dir, then
+        // run `uv sync` there to create runtimeDir/.venv. The launchd plist
+        // points at this venv.
         await run(step: .dependencies) {
-            let venv = scriptDir.appendingPathComponent(".venv/bin/python")
+            let venv = runtimeDir.appendingPathComponent(".venv/bin/python")
             if FileManager.default.fileExists(atPath: venv.path) { return .skipped }
+
+            // Materialize the runtime dir from the bundled template
+            try FileManager.default.createDirectory(at: runtimeDir, withIntermediateDirectories: true)
+            if let src = template {
+                let r = ProcessRunner.exec(
+                    ["/usr/bin/rsync", "-a", "--delete-excluded",
+                     "--exclude=.venv",
+                     "\(src.path)/", "\(runtimeDir.path)/"],
+                    timeout: 60
+                )
+                if r.exitCode != 0 {
+                    throw InstallError("Failed to stage runtime files: \(r.stderr)")
+                }
+            } else if !FileManager.default.fileExists(atPath: runtimeDir.appendingPathComponent("bot_service.py").path) {
+                throw InstallError("No bundled runtime template — run a dev install or rebuild Lotus.app")
+            }
+
             guard let uv = uvPath else { throw InstallError("uv not found") }
-            log("  Running uv sync (this may take a minute)…")
             let r = ProcessRunner.exec([uv, "sync"],
-                                       cwd: scriptDir,
+                                       cwd: runtimeDir,
                                        env: ProcessRunner.enrichedPATH(home: home),
                                        timeout: 600)
             if r.exitCode != 0 {

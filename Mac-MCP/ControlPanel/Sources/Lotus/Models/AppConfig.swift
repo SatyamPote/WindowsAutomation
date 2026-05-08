@@ -9,8 +9,18 @@ struct AppConfig: Codable, Sendable {
 
     // MARK: - Paths
 
-    /// bot_service.py bundled inside the app; dev walk-up as fallback.
+    /// Writable runtime dir under Application Support — where bot_service.py
+    /// and the .venv live after first-launch sync.
+    static var runtimeDir: URL {
+        appDataDir.appendingPathComponent("runtime")
+    }
+
+    /// bot_service.py path. Prefers the writable runtime copy (production
+    /// install path), falls back to the bundled copy (used by InstallManager
+    /// as the source for rsync), then the dev tree.
     static var botScriptURL: URL {
+        let runtime = runtimeDir.appendingPathComponent("bot_service.py")
+        if FileManager.default.fileExists(atPath: runtime.path) { return runtime }
         if let url = Bundle.module.url(forResource: "bot_service", withExtension: "py") {
             return url
         }
@@ -20,6 +30,22 @@ struct AppConfig: Codable, Sendable {
     /// Directory that contains bot_service.py — used as working directory for uv.
     static var botScriptDir: URL {
         botScriptURL.deletingLastPathComponent()
+    }
+
+    /// Read-only runtime template that ships inside the app bundle at
+    /// Lotus.app/Contents/Resources/runtime-template (staged by make_app.sh).
+    static var bundledRuntimeTemplate: URL? {
+        guard let res = Bundle.main.resourceURL else { return nil }
+        let dir = res.appendingPathComponent("runtime-template")
+        return FileManager.default.fileExists(atPath: dir.path) ? dir : nil
+    }
+
+    /// Bundled `uv` binary at Lotus.app/Contents/Resources/bin/uv (universal).
+    /// Returns nil in dev (when running the binary directly out of .build/).
+    static var bundledUVPath: URL? {
+        guard let res = Bundle.main.resourceURL else { return nil }
+        let uv = res.appendingPathComponent("bin/uv")
+        return FileManager.default.isExecutableFile(atPath: uv.path) ? uv : nil
     }
 
     /// Assets directory for logo images.

@@ -162,14 +162,25 @@ final class ServiceManager: Sendable {
         try runLaunchctl(["kickstart", serviceTarget])
     }
 
-    /// Build the ProgramArguments array for the plist, preferring uv.
-    /// bot_service.py is resolved from the app bundle via AppConfig.botScriptURL.
+    /// Build the ProgramArguments array for the plist, preferring the
+    /// runtime venv created by InstallManager from the bundled uv + template.
     private func resolveProgramArgs() -> [String] {
         let fm = FileManager.default
         let botScript = AppConfig.botScriptURL.path
         let scriptDir = AppConfig.botScriptDir
 
-        // 1. uv run — finds pyproject.toml in the script's directory
+        // 1. Runtime venv (production install path)
+        let venvPython = scriptDir.appendingPathComponent(".venv/bin/python").path
+        if fm.fileExists(atPath: venvPython) {
+            return [venvPython, botScript]
+        }
+
+        // 2. Bundled uv → uv run (works without a pre-built venv)
+        if let bundledUV = AppConfig.bundledUVPath?.path {
+            return [bundledUV, "run", "--directory", scriptDir.path, "python", botScript]
+        }
+
+        // 3. System uv (dev mode)
         let uvCandidates = [
             "/opt/homebrew/bin/uv",
             "/usr/local/bin/uv",
@@ -177,16 +188,10 @@ final class ServiceManager: Sendable {
             "\(NSHomeDirectory())/.cargo/bin/uv",
         ]
         for uv in uvCandidates where fm.fileExists(atPath: uv) {
-            return [uv, "run", "python", botScript]
+            return [uv, "run", "--directory", scriptDir.path, "python", botScript]
         }
 
-        // 2. .venv alongside bot_service.py
-        let venvPython = scriptDir.appendingPathComponent(".venv/bin/python").path
-        if fm.fileExists(atPath: venvPython) {
-            return [venvPython, botScript]
-        }
-
-        // 3. system python3
+        // 4. Last-resort system python3
         return ["/usr/bin/env", "python3", botScript]
     }
 

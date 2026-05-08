@@ -18,19 +18,19 @@ GitHub Release.
 
 ```bash
 # 1. Copy the template
-cp release-notes/TEMPLATE.md release-notes/v1.1.0.md
+cp release-notes/TEMPLATE.md release-notes/v2.1.0.md
 
 # 2. Edit — keep the curated highlights tight (3–8 bullets)
-$EDITOR release-notes/v1.1.0.md
+$EDITOR release-notes/v2.1.0.md
 
 # 3. Commit and push
-git add release-notes/v1.1.0.md
-git commit -m "release notes: v1.1.0"
+git add release-notes/v2.1.0.md
+git commit -m "release notes: v2.1.0"
 git push origin main
 
 # 4. Tag and publish (or use the workflow_dispatch UI)
-git tag -a v1.1.0 -m "Lotus v1.1.0"
-git push origin v1.1.0
+git tag -a v2.1.0 -m "Lotus v2.1.0"
+git push origin v2.1.0
 ```
 
 ## Override at publish time
@@ -46,4 +46,5 @@ overrides the file if both are present.
 |---|---|
 | `TEMPLATE.md` | Starting point — copy and rename for each release. |
 | `v1.0.0.md` | First public release. |
+| `v2.0.0.md` | Standalone install (bundled uv + runtime template). |
 | `v<X.Y.Z>.md` | One per shipped release. |
