@@ -48,14 +48,13 @@ struct AppConfig: Codable, Sendable {
         return FileManager.default.isExecutableFile(atPath: uv.path) ? uv : nil
     }
 
-    /// Assets directory for logo images.
+    /// Assets directory for logo images. Looks in Lotus.app/Contents/Resources/assets
+    /// first (staged by make_app.sh), then falls back to the dev tree.
     static var assetsDir: URL? {
-        // Bundle (when app is packaged)
-        if let res = Bundle.module.resourceURL {
+        if let res = Bundle.main.resourceURL {
             let dir = res.appendingPathComponent("assets")
             if FileManager.default.fileExists(atPath: dir.path) { return dir }
         }
-        // Dev fallback
         let dir = _devBaseDir.appendingPathComponent("assets")
         return FileManager.default.fileExists(atPath: dir.path) ? dir : nil
     }

@@ -47,4 +47,5 @@ overrides the file if both are present.
 | `TEMPLATE.md` | Starting point — copy and rename for each release. |
 | `v1.0.0.md` | First public release. |
 | `v2.0.0.md` | Standalone install (bundled uv + runtime template). |
+| `v2.0.1.md` | Fix launch crash from missing SPM resource bundle. |
 | `v<X.Y.Z>.md` | One per shipped release. |

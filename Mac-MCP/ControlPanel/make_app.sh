@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"   # Mac-MCP/
 APP_NAME="Lotus"
 BUNDLE_ID="com.lotus.controlpanel"
-VERSION="2.0.0"
+VERSION="2.0.1"
 APP_DEST="$PROJECT_DIR/$APP_NAME.app"
 ASSETS="$PROJECT_DIR/assets"
 LOGO="$ASSETS/lotus_logo.png"
@@ -53,6 +53,17 @@ RESOURCES="$CONTENTS/Resources"
 mkdir -p "$MACOS" "$RESOURCES"
 
 cp "$BIN" "$MACOS/$APP_NAME"
+
+# Copy the SPM-generated resource bundle next to the binary. Without this,
+# `Bundle.module` throws an assertion failure at runtime — the SPM accessor
+# expects to find Lotus_Lotus.bundle alongside the executable.
+SPM_BUNDLE="$BUILD_DIR/Lotus_Lotus.bundle"
+if [ -d "$SPM_BUNDLE" ]; then
+    cp -R "$SPM_BUNDLE" "$MACOS/"
+    echo "  ✓ Copied SPM resource bundle (Lotus_Lotus.bundle)"
+else
+    echo "  ⚠ Lotus_Lotus.bundle not found at $SPM_BUNDLE — Bundle.module will crash"
+fi
 
 # ── 3. Info.plist ─────────────────────────────────────────────────────────────
 echo "▸ Writing Info.plist…"
@@ -192,6 +203,16 @@ rsync -a \
     --exclude='.DS_Store' \
     "$PROJECT_DIR/src/" "$TEMPLATE_DIR/src/"
 echo "  ✓ Runtime template at $TEMPLATE_DIR ($(du -sh "$TEMPLATE_DIR" | cut -f1))"
+
+# ── 4d. Bundle assets ────────────────────────────────────────────────────────
+echo "▸ Bundling assets…"
+if [ -d "$ASSETS" ]; then
+    rm -rf "$RESOURCES/assets"
+    rsync -a --exclude='.DS_Store' "$ASSETS/" "$RESOURCES/assets/"
+    echo "  ✓ Assets at $RESOURCES/assets"
+else
+    echo "  ⚠ $ASSETS not found — logos will fall back to placeholder"
+fi
 
 # ── 5. Ad-hoc code signing ────────────────────────────────────────────────────
 echo "▸ Ad-hoc signing…"
