@@ -26,13 +26,19 @@ Runner: `macos-15` (Apple Silicon, Xcode 16 / Swift 6)
 
 ### Triggers
 
+The workflow **does not run on push to `main` or pull requests** — it
+only runs when you ask for it.
+
 | Event | What runs | What ships |
 |---|---|---|
-| `push` to `main` (paths under `Mac-MCP/**`) | Build app + DMG | Workflow artifact only |
-| `pull_request` (paths under `Mac-MCP/**`) | Build app + DMG | Workflow artifact only |
 | `push` of tag `v*` (e.g. `v1.0.0`) | Build + publish GitHub Release | DMG attached to the Release |
 | `workflow_dispatch` (manual, `publish=false`) | Build app + DMG | Workflow artifact only |
 | `workflow_dispatch` (manual, `publish=true` + `version`) | Build + publish GitHub Release (creates tag) | DMG attached to the Release |
+
+> Need a CI check on every PR? Add a separate lightweight workflow
+> (e.g. `swift-test.yml`) that only runs `swift build` for fast feedback —
+> keep this build-and-release workflow gated to manual + tag triggers
+> so artifacts and releases stay intentional.
 
 ### Jobs
 
@@ -46,9 +52,12 @@ Runner: `macos-15` (Apple Silicon, Xcode 16 / Swift 6)
    - Otherwise → `0.0.0-<short-sha>` (so dev DMGs are clearly marked)
 6. Patches the resolved version into both `make_app.sh` and `make_dmg.sh`
    (their `VERSION="1.0.0"` lines)
-7. Runs `ControlPanel/make_app.sh` → produces `Mac-MCP/Lotus.app`
+7. Runs `ControlPanel/make_app.sh` → produces `Mac-MCP/Lotus.app` as a
+   **universal binary** (arm64 + x86_64) via
+   `swift build --arch arm64 --arch x86_64`
 8. **Verify Lotus.app** — checks the bundle exists, the binary is
-   executable, and ad-hoc code signature is valid
+   executable, asserts both arm64 and x86_64 slices are present
+   (`lipo -archs`), and ad-hoc code signature is valid
 9. Runs `ControlPanel/make_dmg.sh` → produces `Mac-MCP/dist/Lotus-<version>.dmg`
 10. **Verify DMG** — mounts the DMG to a temp dir and confirms
     `Lotus.app` and the `Applications` symlink are inside, then prints
@@ -336,8 +345,10 @@ These aren't blockers for the current release, but worth tracking:
 - [ ] **Apple notarization** — sign with a Developer ID cert, run
   `xcrun notarytool submit`, staple. Removes the Gatekeeper warning on
   first launch.
-- [ ] **Universal binary** — explicit `swift build -c release --arch arm64 --arch x86_64`
-  and `lipo` if we want Intel support.
+- [x] ~~**Universal binary** — explicit `swift build -c release --arch arm64 --arch x86_64`~~
+  Done. Both arm64 and x86_64 slices ship in every build. Override
+  with `LOTUS_ARCHS="arm64" bash make_app.sh` for a faster host-only
+  local build.
 - [ ] **Cache `uv` and `swift build`** — currently rebuilds from scratch
   every run (~3–5 min). Caching cuts this to under a minute.
 - [ ] **Sparkle auto-updates** — generate appcast.xml in the same

@@ -1,16 +1,11 @@
 name: Build & Release Lotus.app
 
 on:
+  # Tag pushes still trigger a release (Option B in RELEASING.md).
+  # Push to main / PRs no longer trigger the workflow — use the
+  # "Run workflow" button (workflow_dispatch) instead.
   push:
-    branches: [main]
     tags: ['v*']
-    paths:
-      - 'Mac-MCP/**'
-      - '.github/workflows/swift.yml'
-  pull_request:
-    paths:
-      - 'Mac-MCP/**'
-      - '.github/workflows/swift.yml'
   workflow_dispatch:
     inputs:
       publish:
@@ -96,7 +91,15 @@ jobs:
       - name: Verify Lotus.app
         run: |
           test -d Lotus.app || { echo "✗ Lotus.app missing"; exit 1; }
-          test -x Lotus.app/Contents/MacOS/Lotus || { echo "✗ binary missing"; exit 1; }
+          BIN="Lotus.app/Contents/MacOS/Lotus"
+          test -x "$BIN" || { echo "✗ binary missing"; exit 1; }
+          ARCHS="$(lipo -archs "$BIN")"
+          echo "  Architectures: $ARCHS"
+          # Assert universal binary (arm64 + x86_64)
+          for want in arm64 x86_64; do
+            grep -qw "$want" <<< "$ARCHS" || { echo "✗ binary is missing $want — not universal"; exit 1; }
+          done
+          file "$BIN"
           codesign -dv Lotus.app 2>&1 | sed 's/^/  /'
           du -sh Lotus.app
 

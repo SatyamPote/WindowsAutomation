@@ -16,10 +16,14 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"   # Mac-MCP/
 APP_NAME="Lotus"
 BUNDLE_ID="com.lotus.controlpanel"
 VERSION="1.0.0"
-BUILD_DIR="$SCRIPT_DIR/.build/release"
 APP_DEST="$PROJECT_DIR/$APP_NAME.app"
 ASSETS="$PROJECT_DIR/assets"
 LOGO="$ASSETS/lotus_logo.png"
+
+# Architectures to build. Override with LOTUS_ARCHS="arm64" for a host-only build.
+LOTUS_ARCHS="${LOTUS_ARCHS:-arm64 x86_64}"
+ARCH_ARGS=()
+for a in $LOTUS_ARCHS; do ARCH_ARGS+=(--arch "$a"); done
 
 echo "══════════════════════════════════════"
 echo "  Building $APP_NAME.app"
@@ -29,10 +33,16 @@ echo "  Output:  $APP_DEST"
 echo ""
 
 # ── 1. Build release binary ──────────────────────────────────────────────────
-echo "▸ Building Swift package (release)…"
+echo "▸ Building Swift package (release) for: $LOTUS_ARCHS"
 cd "$SCRIPT_DIR"
-swift build -c release
-echo "  ✓ Binary at $BUILD_DIR/$APP_NAME"
+swift build -c release "${ARCH_ARGS[@]}"
+# Resolve the actual output dir (single-arch → .build/release,
+# multi-arch → .build/apple/Products/Release).
+BUILD_DIR="$(swift build -c release "${ARCH_ARGS[@]}" --show-bin-path)"
+BIN="$BUILD_DIR/$APP_NAME"
+test -x "$BIN" || { echo "✗ Built binary not found at $BIN"; exit 1; }
+echo "  ✓ Binary at $BIN"
+echo "  ✓ Architectures: $(lipo -archs "$BIN")"
 
 # ── 2. App bundle structure ──────────────────────────────────────────────────
 echo "▸ Creating app bundle…"
@@ -42,7 +52,7 @@ MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
 mkdir -p "$MACOS" "$RESOURCES"
 
-cp "$BUILD_DIR/$APP_NAME" "$MACOS/$APP_NAME"
+cp "$BIN" "$MACOS/$APP_NAME"
 
 # ── 3. Info.plist ─────────────────────────────────────────────────────────────
 echo "▸ Writing Info.plist…"
