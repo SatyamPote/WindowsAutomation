@@ -31,7 +31,8 @@ Runner: `macos-15` (Apple Silicon, Xcode 16 / Swift 6)
 | `push` to `main` (paths under `Mac-MCP/**`) | Build app + DMG | Workflow artifact only |
 | `pull_request` (paths under `Mac-MCP/**`) | Build app + DMG | Workflow artifact only |
 | `push` of tag `v*` (e.g. `v1.0.0`) | Build + publish GitHub Release | DMG attached to the Release |
-| `workflow_dispatch` (manual button) | Build app + DMG | Workflow artifact only |
+| `workflow_dispatch` (manual, `publish=false`) | Build app + DMG | Workflow artifact only |
+| `workflow_dispatch` (manual, `publish=true` + `version`) | Build + publish GitHub Release (creates tag) | DMG attached to the Release |
 
 ### Jobs
 
@@ -83,6 +84,25 @@ notarization, additional secrets (`APPLE_ID`, `APPLE_TEAM_ID`,
 ---
 
 ## 2. Cutting a release
+
+You have two options.
+
+### Option A — From the GitHub UI (recommended for most cases)
+
+1. Go to **Actions → Build & Release Lotus.app → Run workflow**
+2. Set **Publish a GitHub Release with the built DMG** to `true`
+3. Enter **Release version** (e.g. `1.0.0` — `v` prefix optional)
+4. Click **Run workflow**
+
+The workflow:
+- Builds `Lotus.app` and the DMG with that version stamped in
+- Creates a tag `v<version>` automatically
+- Publishes a GitHub Release with the DMG + checksums + auto-generated notes
+
+> If `publish=true` is set without a version, the run fails fast in the
+> **Validate publish input** step.
+
+### Option B — From the CLI (push a tag)
 
 ```bash
 # 1. Make sure main is green and you're on it
@@ -239,6 +259,22 @@ the DMG itself is broken — common causes:
 The workflow declares `permissions: contents: write` at the top level.
 If a fork or org policy strips that, re-add it explicitly to the
 `release` job.
+
+### "Publish GitHub Release" job shows "skipped"
+This is expected on every push that isn't a release. The job is gated:
+
+```yaml
+if: |
+  startsWith(github.ref, 'refs/tags/v') ||
+  (github.event_name == 'workflow_dispatch' && inputs.publish == true)
+```
+
+It only runs when:
+- A tag matching `v*` is pushed (Option B above), **or**
+- The workflow is dispatched manually with `publish=true` (Option A)
+
+If you want a release, use one of those two paths. Pushes to `main`
+intentionally don't publish.
 
 ### Tag was pushed but no release appeared
 Check the **Actions** tab for the run. Common causes:
