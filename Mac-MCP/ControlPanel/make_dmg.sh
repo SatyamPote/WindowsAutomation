@@ -72,8 +72,17 @@ hdiutil attach "$TMP_DMG" -noautoopen >/dev/null
 MOUNT_DIR="/Volumes/$VOL_NAME"
 sleep 2
 
-# Apply window layout via AppleScript. Failures here are non-fatal.
-osascript <<APPLESCRIPT || true
+# CI runners are headless — Finder may not be running or may not accept
+# AppleScript. Skip styling there; the DMG itself is still produced.
+if [[ -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "  ⚠ CI environment detected — skipping Finder window styling"
+else
+    # Make sure Finder is up before sending it AppleScript
+    open -a Finder >/dev/null 2>&1 || true
+    sleep 1
+
+    # Apply window layout via AppleScript. Failures here are non-fatal.
+    osascript <<APPLESCRIPT || true
 tell application "Finder"
     tell disk "$VOL_NAME"
         open
@@ -96,6 +105,7 @@ tell application "Finder"
     end tell
 end tell
 APPLESCRIPT
+fi
 
 sync
 hdiutil detach "$MOUNT_DIR" -quiet || hdiutil detach "$MOUNT_DIR" -force -quiet

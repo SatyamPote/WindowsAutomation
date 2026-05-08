@@ -19,7 +19,7 @@ permissions:
 jobs:
   build:
     name: Build Lotus.app + DMG
-    runs-on: macos-14
+    runs-on: macos-15
     defaults:
       run:
         working-directory: Mac-MCP
@@ -27,6 +27,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 16 (Swift 6)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.0'
 
       - name: Show toolchain versions
         run: |
@@ -62,13 +67,30 @@ jobs:
       - name: Build Lotus.app
         run: bash ControlPanel/make_app.sh
 
+      - name: Verify Lotus.app
+        run: |
+          test -d Lotus.app || { echo "✗ Lotus.app missing"; exit 1; }
+          test -x Lotus.app/Contents/MacOS/Lotus || { echo "✗ binary missing"; exit 1; }
+          codesign -dv Lotus.app 2>&1 | sed 's/^/  /'
+          du -sh Lotus.app
+
       - name: Build DMG
         run: bash ControlPanel/make_dmg.sh
 
-      - name: Verify artifacts
+      - name: Verify DMG
         run: |
-          ls -lh Lotus.app
-          ls -lh dist/
+          DMG=$(ls dist/Lotus-*.dmg 2>/dev/null | head -n 1)
+          test -n "$DMG" || { echo "✗ no DMG produced"; exit 1; }
+          echo "  DMG: $DMG"
+          du -sh "$DMG"
+          # Sanity-check: mount, list contents, unmount
+          MOUNT=$(mktemp -d)
+          hdiutil attach "$DMG" -mountpoint "$MOUNT" -nobrowse -noautoopen >/dev/null
+          ls -la "$MOUNT"
+          test -d "$MOUNT/Lotus.app" || { hdiutil detach "$MOUNT" -force -quiet; echo "✗ Lotus.app not in DMG"; exit 1; }
+          test -L "$MOUNT/Applications" || { hdiutil detach "$MOUNT" -force -quiet; echo "✗ Applications symlink missing"; exit 1; }
+          hdiutil detach "$MOUNT" -quiet
+          shasum -a 256 "$DMG"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -82,7 +104,7 @@ jobs:
     name: Publish GitHub Release
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Download DMG artifact

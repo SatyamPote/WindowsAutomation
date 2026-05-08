@@ -15,7 +15,14 @@ This document explains:
 ## 1. Workflow overview
 
 File: `.github/workflows/swift.yml`
-Runner: `macos-14` (Apple Silicon)
+Runner: `macos-15` (Apple Silicon, Xcode 16 / Swift 6)
+
+> **Why macos-15?** `Package.swift` declares `swift-tools-version: 6.0`,
+> which requires Xcode 16+. The older `macos-14` runner ships Xcode 15 /
+> Swift 5.10 and fails with `package is using Swift tools version 6.0.0
+> but the installed version is 5.10.0`. The workflow also pins Xcode 16
+> explicitly via `maxim-lobanov/setup-xcode` so the build doesn't break
+> if GitHub changes the default image toolchain.
 
 ### Triggers
 
@@ -30,16 +37,31 @@ Runner: `macos-14` (Apple Silicon)
 
 **`build`** — runs on every trigger
 1. Checks out the repo
-2. Prints macOS / Xcode / Swift versions for the build log
-3. Installs [`uv`](https://docs.astral.sh/uv/) and runs `uv sync` to populate `Mac-MCP/.venv`
-4. Resolves a version string:
+2. Pins Xcode 16 via `maxim-lobanov/setup-xcode@v1` (Swift 6 support)
+3. Prints macOS / Xcode / Swift versions for the build log
+4. Installs [`uv`](https://docs.astral.sh/uv/) and runs `uv sync` to populate `Mac-MCP/.venv`
+5. Resolves a version string:
    - On a `v*` tag → strips the `v` (e.g. `v1.2.3` → `1.2.3`)
    - Otherwise → `0.0.0-<short-sha>` (so dev DMGs are clearly marked)
-5. Patches the resolved version into both `make_app.sh` and `make_dmg.sh`
+6. Patches the resolved version into both `make_app.sh` and `make_dmg.sh`
    (their `VERSION="1.0.0"` lines)
-6. Runs `ControlPanel/make_app.sh` → produces `Mac-MCP/Lotus.app`
-7. Runs `ControlPanel/make_dmg.sh` → produces `Mac-MCP/dist/Lotus-<version>.dmg`
-8. Uploads the DMG as a workflow artifact (retained 30 days)
+7. Runs `ControlPanel/make_app.sh` → produces `Mac-MCP/Lotus.app`
+8. **Verify Lotus.app** — checks the bundle exists, the binary is
+   executable, and ad-hoc code signature is valid
+9. Runs `ControlPanel/make_dmg.sh` → produces `Mac-MCP/dist/Lotus-<version>.dmg`
+10. **Verify DMG** — mounts the DMG to a temp dir and confirms
+    `Lotus.app` and the `Applications` symlink are inside, then prints
+    the SHA-256
+11. Uploads the DMG as a workflow artifact (retained 30 days)
+
+> **Note on DMG window styling:** `make_dmg.sh` detects `$CI` /
+> `$GITHUB_ACTIONS` and skips the AppleScript Finder-styling step on
+> headless runners (it requires an interactive Finder session and is
+> unreliable in CI). The DMG is still produced with the background
+> image staged in `.background/`, the `Applications` symlink, and the
+> bundled app — only the custom icon positions are missing. For a
+> fully styled DMG, build locally via `bash ControlPanel/make_dmg.sh`,
+> or pre-bake a `.DS_Store` and copy it in (see Future improvements).
 
 **`release`** — runs only on `v*` tag pushes
 1. Downloads the DMG built by the `build` job
@@ -153,16 +175,20 @@ sed -i '' "s/^VERSION=\"1.0.0\"/VERSION=\"$VERSION\"/" \
 
 ## 5. Troubleshooting
 
-### `swift build` fails with "command not found"
-The runner needs Xcode CLT. `macos-14` images ship Xcode pre-installed —
-the workflow logs the version with `xcodebuild -version`. If it changes
-unexpectedly, pin the Xcode version with:
+### `swift build` fails with "Swift tools version" mismatch
+`Package.swift` requires Swift 6 (Xcode 16+). The workflow pins Xcode 16
+explicitly:
 
 ```yaml
 - uses: maxim-lobanov/setup-xcode@v1
   with:
-    xcode-version: '15.4'
+    xcode-version: '16.0'
 ```
+
+If a future Swift bump is needed, update both `Package.swift` and the
+`xcode-version` here. To see what Xcode versions are available on the
+runner image, check the
+[macos-15 image manifest](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md).
 
 ### `uv sync` is slow / flaky
 Add a cache step before `uv sync`:
@@ -176,12 +202,38 @@ Add a cache step before `uv sync`:
     key: uv-${{ hashFiles('Mac-MCP/uv.lock') }}
 ```
 
-### DMG build fails at the AppleScript styling step
-The styling step is wrapped in `|| true` and is non-fatal — the DMG is
-still produced, just without the custom window layout. CI runners run
-headless and Finder may not respond to AppleScript reliably. To
-investigate, download the workflow artifact and open the DMG locally to
-confirm the icons are present.
+### DMG window has no custom layout / background
+Expected on CI. `make_dmg.sh` detects `$CI` / `$GITHUB_ACTIONS` and
+skips the AppleScript Finder-styling step because headless runners
+don't have an interactive Finder. The DMG itself is functional — the
+bundled `Lotus.app`, the `Applications` symlink, and the background
+image (`.background/background.png`) are all present.
+
+To get a styled DMG for an actual release, either:
+- Build locally with `bash ControlPanel/make_dmg.sh` and upload the DMG
+  manually to the GitHub Release, **or**
+- Pre-bake a `.DS_Store` once locally and commit it. Then have
+  `make_dmg.sh` copy it into the staging dir on CI:
+  ```bash
+  # One-time, locally:
+  bash ControlPanel/make_dmg.sh             # produces a styled DMG
+  hdiutil attach dist/Lotus-1.0.0.dmg -nobrowse
+  cp "/Volumes/Lotus 1.0.0/.DS_Store" ControlPanel/dmg-template.DS_Store
+  hdiutil detach "/Volumes/Lotus 1.0.0"
+  git add ControlPanel/dmg-template.DS_Store
+  ```
+  Then in `make_dmg.sh`, replace the AppleScript block with
+  `cp ControlPanel/dmg-template.DS_Store "$STAGING/.DS_Store"` before
+  the `hdiutil convert` step.
+
+### DMG fails to mount in the "Verify DMG" step
+The verify step mounts the freshly-built DMG and asserts that
+`Lotus.app` and the `Applications` symlink are inside. If this fails,
+the DMG itself is broken — common causes:
+- `make_app.sh` produced an empty/incomplete `Lotus.app` (Swift compile
+  error masked because the script doesn't `set -e` carefully)
+- The staging dir got polluted by a previous failed run (rare on
+  ephemeral CI runners, but worth a `rm -rf` if reproducing locally)
 
 ### Release job says "Resource not accessible by integration"
 The workflow declares `permissions: contents: write` at the top level.
