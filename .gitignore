@@ -3,7 +3,6 @@
 # User data & generated files
 storage/
 logs/
-dist/
 build/
 *.spec
 
