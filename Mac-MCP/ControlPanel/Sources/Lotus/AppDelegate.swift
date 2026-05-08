@@ -98,9 +98,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 isRunning = await Task.detached { ServiceManager.shared.isProcessAlive() }.value
             }
             if isRunning {
-                await state.stopAgent()
+                await state.stopBot()
             } else {
-                await state.startAgent()
+                await state.startBot()
             }
         }
     }
