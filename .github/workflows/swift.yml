@@ -21,6 +21,10 @@ on:
         description: 'Release version (e.g. 1.0.0). Required if publish=true.'
         type: string
         default: ''
+      notes:
+        description: 'Release notes body (Markdown). Used as-is for the "What''s Changed" section. Overrides release-notes/v<version>.md if both are set.'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -131,8 +135,7 @@ jobs:
     runs-on: macos-15
 
     steps:
-      - name: Checkout (for tag creation on manual dispatch)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Checkout (for release notes + tag creation)
         uses: actions/checkout@v4
 
       - name: Resolve tag name
@@ -146,6 +149,30 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Release tag: $TAG"
+
+      - name: Resolve release body
+        id: body
+        env:
+          INPUT_NOTES: ${{ inputs.notes }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          BODY_FILE="$(mktemp)"
+          if [[ -n "$INPUT_NOTES" ]]; then
+            echo "Using release notes from workflow_dispatch input"
+            printf '%s\n' "$INPUT_NOTES" > "$BODY_FILE"
+          elif [[ -f "release-notes/${TAG}.md" ]]; then
+            echo "Using release notes from release-notes/${TAG}.md"
+            cp "release-notes/${TAG}.md" "$BODY_FILE"
+          else
+            echo "No curated notes found — auto-generated section will be the entire body"
+            : > "$BODY_FILE"
+          fi
+          {
+            echo "body_path=$BODY_FILE"
+          } >> "$GITHUB_OUTPUT"
+          echo "----- body preview -----"
+          cat "$BODY_FILE"
+          echo "------------------------"
 
       - name: Download DMG artifact
         uses: actions/download-artifact@v4
@@ -167,6 +194,7 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.tag.outputs.tag, '-') }}
           generate_release_notes: true
+          body_path: ${{ steps.body.outputs.body_path }}
           files: |
             artifacts/*.dmg
             artifacts/SHA256SUMS.txt

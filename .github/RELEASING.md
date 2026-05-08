@@ -92,12 +92,15 @@ You have two options.
 1. Go to **Actions → Build & Release Lotus.app → Run workflow**
 2. Set **Publish a GitHub Release with the built DMG** to `true`
 3. Enter **Release version** (e.g. `1.0.0` — `v` prefix optional)
-4. Click **Run workflow**
+4. Optionally paste curated **Release notes** (Markdown) into the
+   `notes` field — these become the "What's Changed" section
+5. Click **Run workflow**
 
 The workflow:
 - Builds `Lotus.app` and the DMG with that version stamped in
 - Creates a tag `v<version>` automatically
-- Publishes a GitHub Release with the DMG + checksums + auto-generated notes
+- Publishes a GitHub Release with the DMG + checksums + your curated
+  notes, followed by the auto-generated PR/commit list
 
 > If `publish=true` is set without a version, the run fails fast in the
 > **Validate publish input** step.
@@ -124,6 +127,46 @@ What happens next:
    `https://github.com/<owner>/<repo>/releases/tag/v1.0.0`
 4. The DMG and `SHA256SUMS.txt` are attached
 5. Release notes are auto-generated from PRs/commits since the previous tag
+
+### Curated "What's Changed" notes
+
+The Release body is composed in this order:
+
+1. **Curated section** (your hand-written highlights) — sourced from
+   one of:
+   - The `notes` input on `workflow_dispatch` (Option A), **or**
+   - A checked-in file `release-notes/v<version>.md` (Option B or A
+     when no `notes` input is given)
+   - If neither is provided, this section is empty.
+2. **Auto-generated section** (PR list + Full Changelog link) —
+   appended by GitHub when `generate_release_notes: true`.
+
+To match the [Ollama](https://github.com/ollama/ollama/releases) style
+where the top of the release page is a curated bullet list under
+"What's Changed", commit a file before tagging:
+
+```bash
+# Write the highlights for the next release
+cat > release-notes/v1.1.0.md <<'EOF'
+## What's Changed
+
+- New `Toggle Bot` keyboard shortcut (⌘⇧L) from the menu bar.
+- Bot service now retries Ollama connectivity every 30s instead of bailing.
+- DMG installer compressed ~40% smaller via `zlib-level=9`.
+EOF
+
+git add release-notes/v1.1.0.md
+git commit -m "release notes: v1.1.0"
+git push
+
+# Then either push the tag (Option B) or run the workflow (Option A)
+git tag -a v1.1.0 -m "Lotus v1.1.0"
+git push origin v1.1.0
+```
+
+The release body will be that curated section, followed by GitHub's
+auto-generated "## What's Changed" PR list and `**Full Changelog**` diff
+link.
 
 ### Pre-releases
 
