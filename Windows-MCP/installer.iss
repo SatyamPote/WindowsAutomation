@@ -1,6 +1,6 @@
 [Setup]
 AppName=Lotus Windows Control Agent
-AppVersion=3.0.0
+AppVersion=3.0.1
 AppPublisher=Satyam Pote
 AppPublisherURL=https://github.com/SatyamPote/Lotus
 DefaultDirName={autopf}\Lotus
