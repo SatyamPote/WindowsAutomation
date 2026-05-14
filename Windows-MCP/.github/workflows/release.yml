@@ -1,0 +1,140 @@
+name: Release Lotus
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "version.json"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force release even if tag already exists"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish GitHub Release
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = (Get-Content version.json | ConvertFrom-Json).version
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=v$v"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Check if tag already exists
+        id: tagcheck
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.ver.outputs.tag }}"
+          $force = "${{ github.event.inputs.force }}" -eq "true"
+          git fetch --tags
+          $exists = (git tag -l $tag) -ne ""
+          if ($exists -and -not $force) {
+            Write-Host "Tag $tag already exists — skipping release."
+            "skip=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: Set up Python 3.13
+        if: steps.tagcheck.outputs.skip == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        if: steps.tagcheck.outputs.skip == 'false'
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install Inno Setup
+        if: steps.tagcheck.outputs.skip == 'false'
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Lotus.exe + LotusTray.exe
+        if: steps.tagcheck.outputs.skip == 'false'
+        shell: cmd
+        run: call build.bat
+        env:
+          PYTHONIOENCODING: utf-8
+
+      - name: Build LotusSetup.exe
+        if: steps.tagcheck.outputs.skip == 'false'
+        shell: pwsh
+        run: ./scripts/build_installer.ps1
+
+      - name: Generate release notes
+        if: steps.tagcheck.outputs.skip == 'false'
+        id: notes
+        shell: pwsh
+        run: |
+          python scripts/generate_changelog.py --release --output release_notes.md
+          python scripts/generate_changelog.py --output changelog.txt
+          $body = Get-Content release_notes.md -Raw
+          $delim = "EOF_$([Guid]::NewGuid().ToString('N'))"
+          "body<<$delim"  | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $body            | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $delim           | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Create tag
+        if: steps.tagcheck.outputs.skip == 'false'
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f "${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}" --force
+
+      - name: Publish GitHub Release
+        if: steps.tagcheck.outputs.skip == 'false'
+        id: gh_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Lotus ${{ steps.ver.outputs.tag }}
+          body: ${{ steps.notes.outputs.body }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            installer_output/LotusSetup.exe
+            dist/Lotus.exe
+            dist/LotusTray.exe
+            changelog.txt
+            version.json
+
+      - name: Final summary
+        if: steps.tagcheck.outputs.skip == 'false'
+        shell: pwsh
+        run: |
+          $url = "${{ steps.gh_release.outputs.url }}"
+          $dl  = "https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.tag }}/LotusSetup.exe"
+          $md = @"
+          ## 🌸 Lotus ${{ steps.ver.outputs.tag }} released
+
+          - **Version:** ${{ steps.ver.outputs.version }}
+          - **Release:** $url
+          - **Installer:** $dl
+
+          $((Get-Content release_notes.md -Raw))
+          "@
+          $md | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append

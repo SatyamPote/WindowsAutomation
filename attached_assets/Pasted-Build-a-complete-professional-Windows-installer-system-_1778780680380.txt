@@ -1,0 +1,247 @@
+Build a complete professional Windows installer system for Lotus.
+
+The application is already fully working and compiled using PyInstaller.
+
+Your task is to automate and finalize the Windows deployment pipeline.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌸 GOAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create:
+
+1. Professional installer (.exe setup)
+2. Auto-start integration
+3. Proper Windows installation structure
+4. Desktop + Start Menu shortcuts
+5. Clean uninstall support
+6. One-click install experience
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 BUILD SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Assume the main executable already exists:
+
+dist/Lotus.exe
+
+If missing:
+Automatically build it using PyInstaller.
+
+Use:
+
+* onefile
+* noconsole
+* icon support
+* hidden imports if required
+
+Generate:
+build.bat
+
+That automatically:
+
+* installs missing dependencies
+* builds Lotus.exe
+* verifies output
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛠️ INNO SETUP INTEGRATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Automatically generate:
+
+installer.iss
+
+The installer must:
+
+* install Lotus into Program Files
+* create Start Menu shortcut
+* create Desktop shortcut
+* optionally enable startup on boot
+* support uninstall
+* use Lotus branding
+* use lotus icon/logo
+
+Output:
+installer_output/LotusSetup.exe
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 INSTALLATION STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Install structure:
+
+Lotus/
+├── Lotus.exe
+├── assets/
+├── data/
+├── logs/
+├── storage/
+│   ├── audio/
+│   ├── videos/
+│   ├── images/
+│   ├── screenshots/
+│   ├── recordings/
+│   └── research/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 WINDOWS STARTUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Add startup integration.
+
+Use:
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+
+Add option:
+☑ Launch Lotus on Windows startup
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🖥️ SYSTEM TRAY MODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Lotus must:
+
+* minimize to tray
+* continue running in background
+* support right-click menu:
+
+  * Open
+  * Start Bot
+  * Stop Bot
+  * Exit
+
+Use:
+pystray
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📥 PYTHON AUTO INSTALL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If Python is missing on user system:
+
+Automatically:
+
+1. Detect missing Python
+2. Download official Python installer
+3. Install silently
+4. Continue Lotus setup
+
+Also install:
+
+* mpv
+* ffmpeg
+
+If missing.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 DEPENDENCY CHECKER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before launch:
+Verify:
+
+* Python
+* mpv
+* ffmpeg
+* Ollama
+* yt-dlp
+
+If missing:
+Show installer UI and install automatically.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 AUTO UPDATE SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Add:
+version.json
+
+Command:
+/version
+
+Behavior:
+
+* compare local version
+* compare GitHub release version
+* if outdated:
+  send download link
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📁 STORAGE MANAGEMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create all required folders automatically.
+
+Prevent:
+
+* missing directory crashes
+* invalid paths
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧹 CLEANUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Remove:
+
+* temporary files
+* old build artifacts
+* duplicate folders
+* debug logs
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📜 INSTALLER PAGES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create professional pages:
+
+1. Welcome
+2. Features Overview
+3. Install Location
+4. Startup Options
+5. Install Progress
+6. Finish Page
+
+Do NOT redesign the existing Lotus UI.
+Only improve installer experience.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎨 BRANDING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+App Name:
+Lotus
+
+Owner:
+Satyam Pote
+
+Theme:
+Minimal premium black UI with lotus branding.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 FINAL RESULT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+User flow:
+
+Download LotusSetup.exe
+→ Open installer
+→ Everything installs automatically
+→ Lotus launches
+→ Runs in tray/background
+→ Telegram bot works immediately
+
+No manual setup required.
+
+Everything should behave like a professional production Windows application.
+
+Generate:
+
+* installer.iss
+* build.bat
+* dependency checker
+* startup integration
+* installer assets
+* auto-folder creation
+* uninstall support
+* final deployment structure

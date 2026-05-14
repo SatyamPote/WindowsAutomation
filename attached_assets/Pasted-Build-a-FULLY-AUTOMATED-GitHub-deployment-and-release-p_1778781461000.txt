@@ -1,0 +1,217 @@
+Build a FULLY AUTOMATED GitHub deployment and release pipeline for Lotus.
+
+Goal:
+Every time code changes are completed and tested, Lotus should automatically:
+
+1. Commit changes
+2. Push to GitHub
+3. Generate changelog/comments
+4. Build Windows executables
+5. Build LotusSetup.exe installer
+6. Create GitHub Release
+7. Upload installer + executables
+8. Publish release notes
+9. Send final download link
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌸 REQUIRED SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create a complete CI/CD workflow using:
+
+* GitHub Actions
+* PyInstaller
+* Inno Setup
+* GitHub Releases API
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 AUTO BUILD PIPELINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When code is updated:
+
+Automatically:
+
+* run tests
+* verify imports
+* verify syntax
+* install dependencies
+* build Lotus.exe
+* build LotusTray.exe
+* build LotusSetup.exe
+
+Artifacts:
+
+* Lotus.exe
+* LotusTray.exe
+* LotusSetup.exe
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 AUTO RELEASE SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Automatically:
+
+* detect version changes
+* create GitHub tag
+* publish GitHub Release
+* upload binaries
+* publish release notes
+
+Release title format:
+
+Lotus vX.X.X
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 AUTO CHANGELOG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Generate professional release notes automatically.
+
+Format:
+
+🌸 Lotus vX.X.X
+
+✨ New Features
+🐛 Bug Fixes
+⚡ Performance Improvements
+🔒 Security Updates
+
+Include:
+
+* changed files
+* new systems
+* fixes
+* optimizations
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 GITHUB COMMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Automatically post GitHub comments after successful builds.
+
+Example:
+
+✅ Lotus build completed successfully
+
+Version: v3.1.0
+
+Artifacts:
+
+* Lotus.exe
+* LotusTray.exe
+* LotusSetup.exe
+
+Download: <release link>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 REQUIRED FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Generate:
+
+.github/workflows/build.yml
+
+.github/workflows/release.yml
+
+scripts/build_installer.ps1
+
+scripts/version_bump.py
+
+scripts/generate_changelog.py
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 GITHUB TOKENS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use GitHub Secrets:
+
+GITHUB_TOKEN
+
+Never hardcode tokens.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🪟 WINDOWS BUILD ENVIRONMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use:
+windows-latest
+
+Install automatically:
+
+* Python
+* Inno Setup
+* ffmpeg
+* mpv
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 PYINSTALLER BUILD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build:
+
+Lotus.exe
+LotusTray.exe
+
+Requirements:
+
+* onefile
+* noconsole
+* icon support
+* hidden imports
+* optimized build
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛠️ INNO SETUP BUILD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Automatically compile:
+
+installer.iss
+
+Output:
+installer_output/LotusSetup.exe
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 RELEASE ASSETS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Upload to GitHub Release:
+
+* LotusSetup.exe
+* Lotus.exe
+* LotusTray.exe
+* changelog.txt
+* version.json
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📲 FINAL OUTPUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After successful workflow:
+
+Send:
+
+* release URL
+* download URL
+* version number
+* changelog summary
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 END GOAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+I want Lotus to behave like a professional software company pipeline.
+
+Workflow should be:
+
+Code change
+→ Auto commit
+→ Auto push
+→ Auto build
+→ Auto release
+→ Auto upload installer
+→ Auto publish release
+→ Ready-to-download link
+
+Everything should happen automatically with minimal manual work.

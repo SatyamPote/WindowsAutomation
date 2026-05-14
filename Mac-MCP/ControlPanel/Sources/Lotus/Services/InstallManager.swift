@@ -1,0 +1,308 @@
+import Foundation
+
+// MARK: - Step definitions
+
+enum InstallStep: String, CaseIterable, Sendable {
+    case uv           = "Package manager (uv)"
+    case python       = "Python 3.13"
+    case dependencies = "Bot dependencies"
+    case brew         = "Homebrew"
+    case mediaTools   = "Media tools (ffmpeg · mpv)"
+
+    var description: String {
+        switch self {
+        case .uv:           return "Installs uv, the fast Python package manager"
+        case .python:       return "Installs a managed Python 3.13 runtime via uv"
+        case .dependencies: return "Installs all bot libraries (uv sync)"
+        case .brew:         return "Required to install ffmpeg and mpv for media features"
+        case .mediaTools:   return "Enables video downloads, audio conversion, and music playback"
+        }
+    }
+
+    /// Optional steps can fail without blocking the installer from completing.
+    var isOptional: Bool {
+        switch self { case .brew, .mediaTools: return true; default: return false }
+    }
+}
+
+enum StepStatus: Equatable, Sendable {
+    case pending
+    case running
+    case done       // newly installed
+    case skipped    // already present
+    case failed(String)
+
+    static func == (lhs: StepStatus, rhs: StepStatus) -> Bool {
+        switch (lhs, rhs) {
+        case (.pending, .pending), (.running, .running),
+             (.done, .done), (.skipped, .skipped):      return true
+        case (.failed(let a), .failed(let b)):           return a == b
+        default:                                         return false
+        }
+    }
+
+    var isSuccess: Bool {
+        switch self { case .done, .skipped: return true; default: return false }
+    }
+}
+
+// MARK: - InstallManager
+
+@MainActor
+final class InstallManager: ObservableObject {
+
+    static let shared = InstallManager()
+    private init() {}
+
+    @Published var statuses: [InstallStep: StepStatus] = {
+        Dictionary(uniqueKeysWithValues: InstallStep.allCases.map { ($0, StepStatus.pending) })
+    }()
+    @Published var logLines: [String] = []
+    @Published var isRunning  = false
+    @Published var isComplete = false
+    @Published var hasFailed  = false
+
+    // MARK: - Quick check (synchronous)
+
+    /// True when the Python venv with all deps is already present in the
+    /// writable runtime dir (or in the dev source tree).
+    var envIsReady: Bool {
+        let runtimeVenv = AppConfig.runtimeDir.appendingPathComponent(".venv/bin/python")
+        if FileManager.default.fileExists(atPath: runtimeVenv.path) { return true }
+        let devVenv = AppConfig._devBaseDir.appendingPathComponent(".venv/bin/python")
+        return FileManager.default.fileExists(atPath: devVenv.path)
+    }
+
+    // MARK: - Run installer
+
+    func runInstall() async {
+        guard !isRunning else { return }
+        isRunning  = true
+        hasFailed  = false
+        isComplete = false
+        for step in InstallStep.allCases { statuses[step] = .pending }
+        logLines = []
+
+        // Capture sendable values up-front (no actor-hopping inside closures)
+        let home       = NSHomeDirectory()
+        let runtimeDir = AppConfig.runtimeDir
+        let bundledUV  = AppConfig.bundledUVPath?.path
+        let template   = AppConfig.bundledRuntimeTemplate
+
+        // ── Step 1: uv ────────────────────────────────────────────────────
+        // Prefer the bundled uv binary that ships inside Lotus.app.
+        // Fall back to system uv (dev mode), and only as a last resort
+        // download via curl.
+        await run(step: .uv) {
+            if let bundled = bundledUV, FileManager.default.isExecutableFile(atPath: bundled) {
+                return .skipped
+            }
+            if ProcessRunner.findUV(home: home) != nil { return .skipped }
+            let r = ProcessRunner.exec(
+                ["/bin/sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"],
+                env: ProcessRunner.enrichedPATH(home: home),
+                timeout: 120
+            )
+            if r.exitCode != 0 {
+                throw InstallError(r.stderr.isEmpty ? "uv install failed (exit \(r.exitCode))" : r.stderr)
+            }
+            return .done
+        }
+
+        let uvPath: String? = bundledUV ?? ProcessRunner.findUV(home: home)
+
+        // ── Step 2: Python 3.13 ───────────────────────────────────────────
+        await run(step: .python) {
+            guard let uv = uvPath else { throw InstallError("uv not found — restart and retry") }
+            let check = ProcessRunner.exec([uv, "python", "find", "3.13"], timeout: 8)
+            if check.exitCode == 0 { return .skipped }
+            let r = ProcessRunner.exec([uv, "python", "install", "3.13"],
+                                       env: ProcessRunner.enrichedPATH(home: home), timeout: 300)
+            if r.exitCode != 0 {
+                throw InstallError(r.stderr.isEmpty ? "Python install failed (exit \(r.exitCode))" : r.stderr)
+            }
+            return .done
+        }
+
+        // ── Step 3: Bot dependencies ──────────────────────────────────────
+        // Stage bundled runtime template into the writable runtime dir, then
+        // run `uv sync` there to create runtimeDir/.venv. The launchd plist
+        // points at this venv.
+        await run(step: .dependencies) {
+            let venv = runtimeDir.appendingPathComponent(".venv/bin/python")
+            if FileManager.default.fileExists(atPath: venv.path) { return .skipped }
+
+            // Materialize the runtime dir from the bundled template
+            try FileManager.default.createDirectory(at: runtimeDir, withIntermediateDirectories: true)
+            if let src = template {
+                let r = ProcessRunner.exec(
+                    ["/usr/bin/rsync", "-a", "--delete-excluded",
+                     "--exclude=.venv",
+                     "\(src.path)/", "\(runtimeDir.path)/"],
+                    timeout: 60
+                )
+                if r.exitCode != 0 {
+                    throw InstallError("Failed to stage runtime files: \(r.stderr)")
+                }
+            } else if !FileManager.default.fileExists(atPath: runtimeDir.appendingPathComponent("bot_service.py").path) {
+                throw InstallError("No bundled runtime template — run a dev install or rebuild Lotus.app")
+            }
+
+            guard let uv = uvPath else { throw InstallError("uv not found") }
+            let r = ProcessRunner.exec([uv, "sync"],
+                                       cwd: runtimeDir,
+                                       env: ProcessRunner.enrichedPATH(home: home),
+                                       timeout: 600)
+            if r.exitCode != 0 {
+                let detail = r.stderr.split(separator: "\n").suffix(10).joined(separator: "\n")
+                throw InstallError(detail.isEmpty ? "uv sync failed (exit \(r.exitCode))" : detail)
+            }
+            return .done
+        }
+
+        // ── Step 4: Homebrew (optional) ───────────────────────────────────
+        await run(step: .brew, isOptional: true) {
+            if ProcessRunner.findBrew() != nil { return .skipped }
+            log("  Installing Homebrew (may take a few minutes)…")
+            let r = ProcessRunner.exec(
+                ["/bin/bash", "-c",
+                 "curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | NONINTERACTIVE=1 bash"],
+                env: ProcessRunner.enrichedPATH(home: home),
+                timeout: 600
+            )
+            if r.exitCode != 0 {
+                let detail = r.stderr.split(separator: "\n").suffix(5).joined(separator: "\n")
+                throw InstallError(detail.isEmpty ? "Homebrew install failed (exit \(r.exitCode))" : detail)
+            }
+            return .done
+        }
+
+        let brewPath = ProcessRunner.findBrew()
+
+        // ── Step 5: Media tools — ffmpeg + mpv (optional) ─────────────────
+        await run(step: .mediaTools, isOptional: true) {
+            guard let brew = brewPath else {
+                throw InstallError(
+                    "Homebrew not found — run `brew install mpv ffmpeg` manually to enable music and video features"
+                )
+            }
+            let env = ProcessRunner.enrichedPATH(home: home)
+            var toInstall: [String] = []
+
+            let ffmpegCheck = ProcessRunner.exec([brew, "list", "--formula", "ffmpeg"], timeout: 10)
+            if ffmpegCheck.exitCode != 0 { toInstall.append("ffmpeg") }
+
+            let mpvCheck = ProcessRunner.exec([brew, "list", "--formula", "mpv"], timeout: 10)
+            if mpvCheck.exitCode != 0 { toInstall.append("mpv") }
+
+            if toInstall.isEmpty { return .skipped }
+
+            log("  Installing \(toInstall.joined(separator: " + "))…")
+            let r = ProcessRunner.exec([brew, "install"] + toInstall, env: env, timeout: 600)
+            if r.exitCode != 0 {
+                let detail = r.stderr.split(separator: "\n").suffix(8).joined(separator: "\n")
+                throw InstallError(detail.isEmpty ? "brew install failed (exit \(r.exitCode))" : detail)
+            }
+            return .done
+        }
+
+        isRunning  = false
+        isComplete = !hasFailed
+    }
+
+    // MARK: - Private helpers
+
+    private func run(
+        step: InstallStep,
+        isOptional: Bool = false,
+        work: @Sendable @escaping () throws -> StepStatus
+    ) async {
+        guard !hasFailed else { return }
+        statuses[step] = .running
+        appendLog("▸ \(step.rawValue)…")
+        do {
+            let status = try await Task.detached(priority: .userInitiated) { try work() }.value
+            statuses[step] = status
+            appendLog(status == .skipped ? "  ✓ Already installed" : "  ✓ Done")
+        } catch {
+            statuses[step] = .failed(error.localizedDescription)
+            appendLog("  ✗ \(error.localizedDescription)")
+            if !isOptional { hasFailed = true }
+        }
+    }
+
+    func appendLog(_ line: String) {
+        let ts = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        logLines.append("[\(ts)] \(line)")
+        if logLines.count > 400 { logLines.removeFirst(logLines.count - 400) }
+    }
+}
+
+// MARK: - ProcessRunner
+
+struct ProcessRunner: Sendable {
+
+    struct Output: Sendable {
+        let exitCode: Int32
+        let stdout: String
+        let stderr: String
+    }
+
+    static func findUV(home: String) -> String? {
+        [
+            "\(home)/.local/bin/uv",
+            "/opt/homebrew/bin/uv",
+            "/usr/local/bin/uv",
+            "\(home)/.cargo/bin/uv",
+        ].first { FileManager.default.fileExists(atPath: $0) }
+    }
+
+    static func findBrew() -> String? {
+        ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+            .first { FileManager.default.fileExists(atPath: $0) }
+    }
+
+    static func enrichedPATH(home: String) -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let extra = ["\(home)/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
+        let current = env["PATH"] ?? "/usr/bin:/bin"
+        env["PATH"] = (extra + [current]).joined(separator: ":")
+        return env
+    }
+
+    static func exec(
+        _ args: [String],
+        cwd: URL? = nil,
+        env: [String: String]? = nil,
+        timeout: TimeInterval = 60
+    ) -> Output {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: args[0])
+        if args.count > 1 { proc.arguments = Array(args.dropFirst()) }
+        if let cwd { proc.currentDirectoryURL = cwd }
+        proc.environment = env ?? ProcessInfo.processInfo.environment
+
+        let outPipe = Pipe(), errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError  = errPipe
+
+        do { try proc.run() } catch {
+            return Output(exitCode: -1, stdout: "", stderr: error.localizedDescription)
+        }
+        proc.waitUntilExit()
+
+        let stdout = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let stderr = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        return Output(exitCode: proc.terminationStatus, stdout: stdout, stderr: stderr)
+    }
+}
+
+// MARK: - Error
+
+struct InstallError: LocalizedError {
+    let errorDescription: String?
+    init(_ message: String) { errorDescription = message }
+}
+
+// Allow log(_:) free function inside closures to forward to InstallManager
+private func log(_ message: String) {}   // no-op placeholder so closures compile

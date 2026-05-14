@@ -1,0 +1,101 @@
+# ─────────────────────────────────────────────────────────────────────────
+# Lotus .gitignore — never commit generated binaries, caches, or user data
+# ─────────────────────────────────────────────────────────────────────────
+
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── PyInstaller / Windows build artifacts ─────────────────────────────────
+build/
+dist/
+*.spec
+*.manifest
+*.exe
+*.dll
+*.pdb
+*.ilk
+!Windows-MCP/bin/**/*.dll
+!Windows-MCP/bin/**/*.exe
+
+# ── Inno Setup output ─────────────────────────────────────────────────────
+installer_output/
+*.iss.bak
+LotusSetup*.exe
+Lotus.exe
+LotusTray.exe
+
+# ── Lotus runtime data ────────────────────────────────────────────────────
+storage/
+logs/
+reports/
+data/
+recordings/
+screenshots/
+research_pdfs/
+*.log
+*.pid
+
+# ── Generated media ───────────────────────────────────────────────────────
+*.mp4
+*.mp3
+*.wav
+*.webm
+*.avi
+*.mkv
+*.ogg
+*.flac
+storage/images/
+storage/videos/
+storage/audio/
+storage/temp/
+storage/research/
+
+# Allow committed brand assets even though *.png is otherwise free
+# (Lotus assets/ contain the brand logo and installer images)
+!Windows-MCP/assets/**
+!Mac-MCP/assets/**
+!app/static/**
+
+# ── Secrets / config ──────────────────────────────────────────────────────
+.env
+*.env.local
+config.json
+config/config.json
+Windows-MCP/.env
+**/*.secret
+
+# ── Editors / OS junk ─────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Archives ──────────────────────────────────────────────────────────────
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# ── Large pre-built reference binaries (do NOT commit) ────────────────────
+attached_assets/*.exe
+attached_assets/*.zip
+attached_assets/*.dmg
+attached_assets/*.msi
+
+# ── Replit local ──────────────────────────────────────────────────────────
+.local/

@@ -1,0 +1,204 @@
+name: Build & Release Lotus.app
+
+on:
+  # Tag pushes still trigger a release (Option B in RELEASING.md).
+  # Push to main / PRs no longer trigger the workflow — use the
+  # "Run workflow" button (workflow_dispatch) instead.
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish a GitHub Release with the built DMG'
+        type: boolean
+        default: false
+      version:
+        description: 'Release version (e.g. 1.0.0). Required if publish=true.'
+        type: string
+        default: ''
+      notes:
+        description: 'Release notes body (Markdown). Used as-is for the "What''s Changed" section. Overrides release-notes/v<version>.md if both are set.'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Lotus.app + DMG
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: Mac-MCP
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16 (Swift 6)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.0'
+
+      - name: Show toolchain versions
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+
+      - name: Sync Python dependencies
+        run: uv sync
+
+      - name: Resolve release version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          elif [[ "$INPUT_PUBLISH" == "true" && -n "$INPUT_VERSION" ]]; then
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $VERSION"
+
+      - name: Validate publish input
+        if: github.event_name == 'workflow_dispatch' && inputs.publish == true
+        run: |
+          if [[ -z "${{ inputs.version }}" ]]; then
+            echo "✗ publish=true requires a non-empty 'version' input"
+            exit 1
+          fi
+
+      - name: Stamp version into build scripts
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          /usr/bin/sed -i '' -E "s/^VERSION=\".*\"/VERSION=\"$VERSION\"/" \
+            ControlPanel/make_app.sh ControlPanel/make_dmg.sh
+          grep '^VERSION=' ControlPanel/make_app.sh ControlPanel/make_dmg.sh
+
+      - name: Build Lotus.app
+        run: bash ControlPanel/make_app.sh
+
+      - name: Verify Lotus.app
+        run: |
+          test -d Lotus.app || { echo "✗ Lotus.app missing"; exit 1; }
+          BIN="Lotus.app/Contents/MacOS/Lotus"
+          test -x "$BIN" || { echo "✗ binary missing"; exit 1; }
+          ARCHS="$(lipo -archs "$BIN")"
+          echo "  Architectures: $ARCHS"
+          # Assert universal binary (arm64 + x86_64)
+          for want in arm64 x86_64; do
+            grep -qw "$want" <<< "$ARCHS" || { echo "✗ binary is missing $want — not universal"; exit 1; }
+          done
+          file "$BIN"
+          codesign -dv Lotus.app 2>&1 | sed 's/^/  /'
+          du -sh Lotus.app
+
+      - name: Build DMG
+        run: bash ControlPanel/make_dmg.sh
+
+      - name: Verify DMG
+        run: |
+          DMG=$(ls dist/Lotus-*.dmg 2>/dev/null | head -n 1)
+          test -n "$DMG" || { echo "✗ no DMG produced"; exit 1; }
+          echo "  DMG: $DMG"
+          du -sh "$DMG"
+          # Sanity-check: mount, list contents, unmount
+          MOUNT=$(mktemp -d)
+          hdiutil attach "$DMG" -mountpoint "$MOUNT" -nobrowse -noautoopen >/dev/null
+          ls -la "$MOUNT"
+          test -d "$MOUNT/Lotus.app" || { hdiutil detach "$MOUNT" -force -quiet; echo "✗ Lotus.app not in DMG"; exit 1; }
+          test -L "$MOUNT/Applications" || { hdiutil detach "$MOUNT" -force -quiet; echo "✗ Applications symlink missing"; exit 1; }
+          hdiutil detach "$MOUNT" -quiet
+          shasum -a 256 "$DMG"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lotus-${{ steps.version.outputs.version }}-dmg
+          path: Mac-MCP/dist/*.dmg
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish == true)
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout (for release notes + tag creation)
+        uses: actions/checkout@v4
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            RAW="${{ inputs.version }}"
+            TAG="v${RAW#v}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Release tag: $TAG"
+
+      - name: Resolve release body
+        id: body
+        env:
+          INPUT_NOTES: ${{ inputs.notes }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          BODY_FILE="$(mktemp)"
+          if [[ -n "$INPUT_NOTES" ]]; then
+            echo "Using release notes from workflow_dispatch input"
+            printf '%s\n' "$INPUT_NOTES" > "$BODY_FILE"
+          elif [[ -f "release-notes/${TAG}.md" ]]; then
+            echo "Using release notes from release-notes/${TAG}.md"
+            cp "release-notes/${TAG}.md" "$BODY_FILE"
+          else
+            echo "No curated notes found — auto-generated section will be the entire body"
+            : > "$BODY_FILE"
+          fi
+          {
+            echo "body_path=$BODY_FILE"
+          } >> "$GITHUB_OUTPUT"
+          echo "----- body preview -----"
+          cat "$BODY_FILE"
+          echo "------------------------"
+
+      - name: Download DMG artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Lotus-*-dmg
+          merge-multiple: true
+          path: artifacts
+
+      - name: Compute checksum
+        run: |
+          cd artifacts
+          shasum -a 256 *.dmg | tee SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Lotus ${{ steps.tag.outputs.tag }}
+          draft: false
+          prerelease: ${{ contains(steps.tag.outputs.tag, '-') }}
+          generate_release_notes: true
+          body_path: ${{ steps.body.outputs.body_path }}
+          files: |
+            artifacts/*.dmg
+            artifacts/SHA256SUMS.txt

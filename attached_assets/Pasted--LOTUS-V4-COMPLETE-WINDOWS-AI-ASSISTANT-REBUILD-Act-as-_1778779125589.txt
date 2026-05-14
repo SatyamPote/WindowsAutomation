@@ -1,0 +1,519 @@
+# LOTUS V4 — COMPLETE WINDOWS AI ASSISTANT REBUILD
+
+Act as a senior Windows software architect and Python automation engineer.
+
+You are rebuilding and stabilizing my project called “Lotus”.
+
+Lotus is a Windows desktop AI assistant controlled through Telegram.
+
+The project already exists but many systems are unstable, inconsistent, or overcomplicated.
+
+Your task is to:
+
+* Refactor the architecture
+* Fix all broken command systems
+* Improve performance
+* Add missing features
+* Create a professional Windows application structure
+* Keep the UI modern and stable
+* Make all commands reliable
+* Make the app production-ready
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌸 CORE IDENTITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+App Name:
+Lotus
+
+Owner:
+Satyam Pote
+
+Platform:
+Windows
+
+Control Method:
+Telegram Bot + Desktop App
+
+Main Goal:
+Control Windows remotely with natural commands.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 CRITICAL FIXES FIRST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Fix these existing problems:
+
+1. Music system crashes
+2. tuple.get errors
+3. AI intercepts commands incorrectly
+4. Multiple songs play simultaneously
+5. Research gives empty results
+6. Files cannot open/send correctly
+7. Random AI replies appear
+8. Commands route incorrectly
+9. PDF reports fail
+10. Playlist system unstable
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ COMMAND ROUTING SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create a strict router priority:
+
+1. File commands
+2. Music commands
+3. System commands
+4. Research commands
+5. AI chat fallback
+
+AI must NEVER override real commands.
+
+If command matches:
+
+* execute directly
+
+Else:
+
+* pass to AI model
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📁 FILE SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Commands:
+
+find <query>
+open <filename>
+send <filename>
+ls
+cd <folder>
+tree
+
+Features:
+
+* fuzzy file search
+* recursive scanning
+* extension support
+* open in default application
+* upload directly to Telegram
+
+Search locations:
+
+* Desktop
+* Downloads
+* Documents
+* storage/
+
+Add:
+
+* recent files cache
+* faster indexing
+* hidden file filtering
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 MUSIC SYSTEM (REBUILD)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Current system is broken.
+
+Rebuild completely using:
+
+* yt-dlp
+* mpv
+
+Features:
+
+play <song>
+pause
+resume
+stop
+next
+volume up
+volume down
+
+Playlist commands:
+
+create playlist <name>
+delete playlist <name>
+play playlist <name>
+add to playlist <name> <song>
+
+Store playlists in:
+data/playlists.json
+
+Architecture:
+Use ONE player object only.
+
+self.player = {
+"process": None,
+"playlist": [],
+"index": 0,
+"current_song": None
+}
+
+Before playing:
+
+* terminate existing player
+* kill ghost mpv instances
+
+Use:
+taskkill /IM mpv.exe /F
+
+IMPORTANT:
+No multiple audio instances allowed.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔎 RESEARCH ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Commands:
+
+research <topic>
+
+System must:
+
+* search multiple sources
+* scrape web pages
+* summarize intelligently
+* generate professional PDF
+* download topic images
+* send report to Telegram
+
+Research sources:
+
+* Wikipedia
+* DuckDuckGo
+* direct scraping
+* news sites
+
+Generate:
+
+* summary
+* key points
+* sources
+* downloaded images
+* PDF report
+
+Save reports:
+storage/research/
+
+Add:
+
+* charts
+* topic cover image
+* timestamp
+* metadata
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 AI CHAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Commands:
+
+chat <prompt>
+
+Use:
+Ollama
+
+Model:
+phi3 or llama3
+
+Features:
+
+* local AI only
+* no cloud APIs
+* streaming responses
+* markdown cleanup
+* code formatting
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔊 VOICE SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use:
+tiny-tts
+
+Commands:
+
+say <text>
+
+Features:
+
+* generate local speech
+* play in max volume
+* send same audio to Telegram
+* notification voices
+
+Voice Examples:
+
+“Hey, I am Lotus. Now playing music.”
+
+“Hey, I am Lotus. Research completed successfully.”
+
+“Hey, I am Lotus. Download completed.”
+
+Add:
+
+* male/female voice selection
+* voice speed
+* voice volume
+* mute voice command
+
+Commands:
+voice on
+voice off
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🖥️ SYSTEM COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Commands:
+
+dashboard
+take screenshot
+record screen <sec>
+lock
+sleep
+shutdown
+restart
+storage status
+
+Dashboard must show:
+
+* CPU
+* RAM
+* GPU
+* Battery
+* Temperature
+* Disk
+* IP
+* Uptime
+* Running apps
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📸 SCREENSHOT & RECORDING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+take screenshot
+record screen <sec>
+
+Save to:
+storage/screenshots/
+storage/recordings/
+
+Add:
+
+* timestamp filenames
+* compression
+* Telegram upload
+* progress notifications
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 DOWNLOAD MANAGER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Commands:
+
+download video <url>
+download audio <url>
+download image <topic>
+download book <topic>
+
+Features:
+
+* yt-dlp support
+* quality selection
+* mp3 conversion
+* Telegram upload
+* terminal progress bar
+* parallel downloads
+
+Save:
+storage/videos/
+storage/audio/
+storage/images/
+storage/books/
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 ANALYTICS SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Track:
+
+* commands used
+* total downloads
+* most played songs
+* screenshots taken
+* uptime
+
+Save:
+data/stats.json
+
+Telegram command:
+analytics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔐 SECURITY SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Allowed Telegram users only.
+
+Features:
+
+* whitelist
+* owner-only dangerous commands
+* command confirmations
+
+Example:
+shutdown
+
+Bot asks:
+“Are you sure? yes/no”
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 WINDOWS STARTUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Lotus must:
+
+* auto start with Windows
+* minimize to tray
+* run silently
+* restart if crashed
+
+Use:
+
+* pystray
+* registry startup
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📂 STORAGE MANAGEMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create clean structure:
+
+storage/
+├── audio/
+├── videos/
+├── screenshots/
+├── recordings/
+├── images/
+├── books/
+├── research/
+
+Auto cleanup:
+
+* delete temp files
+* remove duplicates
+* limit storage size
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎨 TELEGRAM UI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Make replies professional.
+
+Single-response format only.
+
+Use:
+
+━━━━━━━━━━━━━━━━━━━━
+📖 Lotus Response
+━━━━━━━━━━━━━━━━━━━━ <message>
+━━━━━━━━━━━━━━━━━━━━
+
+NO duplicate messages.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📦 WINDOWS APPLICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build:
+Lotus.exe
+
+Requirements:
+
+* standalone executable
+* works without Python installed
+* auto dependency installation
+* custom installer
+* desktop shortcut
+* startup option
+
+Use:
+
+* PyInstaller
+* Inno Setup
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔄 AUTO UPDATE SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Command:
+/version
+
+If outdated:
+
+* send GitHub release link
+* notify user
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛠️ PROJECT CLEANUP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Remove:
+
+* unused files
+* duplicate systems
+* broken code
+* temporary scripts
+* debug spam
+
+Improve:
+
+* folder structure
+* modularity
+* maintainability
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📚 REQUIRED LIBRARIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use:
+
+* python-telegram-bot
+* yt-dlp
+* mpv
+* pyautogui
+* psutil
+* pystray
+* requests
+* beautifulsoup4
+* pillow
+* reportlab
+* rich
+* fuzzywuzzy
+* tiny-tts
+* pycaw
+* pywin32
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔥 FINAL GOAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Lotus should feel like:
+
+* Jarvis for Windows
+* modern
+* stable
+* private
+* powerful
+* minimal
+* fast
+
+The entire system must work reliably before adding advanced features.
+
+Focus on:
+STABILITY FIRST.
+Then features.

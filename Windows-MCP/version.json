@@ -1,0 +1,17 @@
+{
+  "version": "3.0.0",
+  "channel": "stable",
+  "build_date": "2026-05-14",
+  "github_repo": "SatyamPote/Lotus",
+  "release_url": "https://github.com/SatyamPote/Lotus/releases/latest",
+  "changelog_url": "https://github.com/SatyamPote/Lotus/blob/main/CHANGELOG.md",
+  "highlights": [
+    "Strict command router (apps vs files cleanly split)",
+    "mpv IPC pause/resume/volume actually work",
+    "Real duplicate-message suppression",
+    "Centralized Telegram reply formatter",
+    "Robust Wikipedia + DuckDuckGo research engine",
+    "System tray with Start/Stop/Open/Exit menu",
+    "Auto-update check via /version"
+  ]
+}
