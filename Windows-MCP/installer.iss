@@ -11,8 +11,10 @@ UninstallDisplayIcon={app}\Lotus.exe
 Compression=lzma2/max
 SolidCompression=yes
 OutputDir=installer_output
-OutputBaseFilename=LotusSetup
+OutputBaseFilename=LotusSetup_v3.2
 SetupIconFile=assets\lotus_icon.ico
+WizardImageFile=assets\wizard_image.bmp
+WizardSmallImageFile=assets\wizard_small.bmp
 WizardStyle=modern
 ; Requires admin for Defender exclusions and ProgramData access
 PrivilegesRequired=admin
@@ -63,22 +65,20 @@ Filename: "taskkill.exe"; Parameters: "/F /IM LotusTray.exe /T"; Flags: runhidde
 
 [Code]
 // ═══════════════════════════════════════════════════════════
-// VC++ REDISTRIBUTABLE CHECK
+// VC++ REDISTRIBUTABLE CHECK (Production Stable)
 // ═══════════════════════════════════════════════════════════
 
 function VCRedistNeedsInstall: Boolean;
 var
   Version: String;
 begin
-  // Check for VC++ 2015-2022 Redistributable (x64)
+  // Use HKLM64 to avoid CallSpawnServer issues with 32/64 bit redirection
   if RegQueryStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Version', Version) then
   begin
-    Log('VC++ Redist version found: ' + Version);
     Result := False;
   end
   else
   begin
-    Log('VC++ Redist not found.');
     Result := True;
   end;
 end;
@@ -89,19 +89,13 @@ var
 begin
   if VCRedistNeedsInstall then
   begin
-    if MsgBox('Lotus requires the Microsoft Visual C++ Redistributable to run.' + #13#10 + #13#10 +
-              'Would you like to download and install it now?', mbConfirmation, MB_YESNO) = idYes then
+    if MsgBox('Lotus requires the Microsoft Visual C++ Redistributable.' + #13#10 + #13#10 +
+              'Download it now?', mbConfirmation, MB_YESNO) = idYes then
     begin
-      // In a full production CI/CD, we'd bundle the redist or use idp (Inno Download Plugin)
-      // For this build, we'll guide the user or attempt a silent download if tools are available.
       ShellExec('open', 'https://aka.ms/vs/17/release/vc_redist.x64.exe', '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
     end;
   end;
 end;
-
-// ═══════════════════════════════════════════════════════════
-// DEFENDER EXCLUSIONS ON INSTALL
-// ═══════════════════════════════════════════════════════════
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -109,7 +103,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    // Add installation directory to Windows Defender exclusions
-    Exec('powershell.exe', '-WindowStyle Hidden -NoProfile -Command "Add-MpPreference -ExclusionPath ''' + ExpandConstant('{app}') + ''',''' + ExpandConstant('{commonappdata}\Lotus') + '''"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // Robust exclusion for both App and ProgramData
+    Exec('powershell.exe', '-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command "Add-MpPreference -ExclusionPath ''' + ExpandConstant('{app}') + ''',''' + ExpandConstant('{commonappdata}\Lotus') + '''"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
