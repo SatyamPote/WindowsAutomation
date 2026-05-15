@@ -49,7 +49,7 @@ if (-not (Test-Path $OutDir)) {
 # Pre-flight: confirm PyInstaller outputs exist
 foreach ($exe in @("dist\Lotus.exe", "dist\LotusTray.exe")) {
     if (-not (Test-Path $exe)) {
-        throw "Missing $exe — run build.bat first."
+        throw "Missing $exe - run build.bat first."
     }
 }
 

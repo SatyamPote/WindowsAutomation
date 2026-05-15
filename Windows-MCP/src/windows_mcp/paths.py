@@ -96,14 +96,13 @@ def _find_standard_claude_dir() -> Path | None:
 
 def get_lotus_bin_dir() -> Path:
     """Find the Lotus 'bin' directory containing mpv, yt-dlp, ffmpeg."""
-    import sys
+    from windows_mcp.assets import get_resource_path
 
     # All candidate locations, checked in order
     candidates = []
 
-    # 1. Frozen exe (PyInstaller) — check next to the .exe first
-    if getattr(sys, 'frozen', False):
-        candidates.append(Path(sys.executable).parent / "bin")
+    # 1. Bundled or next to EXE (Primary for production)
+    candidates.append(Path(get_resource_path("bin")))
 
     # 2. Relative to this source file (src/windows_mcp/ → up to Lotus/)
     # This is primary for development environments

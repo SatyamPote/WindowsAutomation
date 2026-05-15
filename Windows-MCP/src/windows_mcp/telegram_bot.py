@@ -32,6 +32,7 @@ from windows_mcp.desktop.powershell import PowerShellExecutor
 from windows_mcp.media.music_player import player as music_player
 from windows_mcp.media.downloader import download_manager
 from windows_mcp.media.voice_system import VoiceSystem
+from windows_mcp.media.screen_recorder import screen_recorder
 from windows_mcp.research.research_engine import ResearchEngine
 from windows_mcp.filesystem.storage_manager import storage_manager
 from windows_mcp.tools.activity_logger import activity_logger
@@ -129,9 +130,15 @@ def require_auth(func):
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         user = update.effective_user
         if not user: return
-        allowed = os.getenv("TELEGRAM_ALLOWED_USER_IDS", "")
+        allowed = os.getenv("TELEGRAM_ALLOWED_USER_IDS", "").strip()
         if not allowed:
-            await update.effective_message.reply_text(f"🔒 Unauthorized. `TELEGRAM_ALLOWED_USER_IDS` is not set.\nYour Telegram User ID is: `{user.id}`", parse_mode="MarkdownV2")
+            # Auth not configured yet — always reply so user is never silently dropped
+            await update.effective_message.reply_text(
+                f"🔒 Bot not fully configured yet.\n"
+                f"Your Telegram User ID is: `{user.id}`\n\n"
+                f"Add your ID to `config.json` and restart Lotus.",
+                parse_mode="Markdown"
+            )
             return
         try:
             allowed_ids = [int(x.strip()) for x in allowed.split(",") if x.strip()]
@@ -139,13 +146,17 @@ def require_auth(func):
                 await update.effective_message.reply_text(
                     f"🔒 *Access Denied*\nYour ID (`{user.id}`) is not in the allowed list.\n\n"
                     f"Admin/Owner: Satyam Pote\nGitHub: https://github.com/SatyamPote\n\n"
-                    f"Add your ID to `.env` or `config.json` to enable access.",
+                    f"Add your ID to `config.json` and restart Lotus.",
                     parse_mode="Markdown"
                 )
                 logger.warning("Unauthorized access attempt from ID: %s", user.id)
                 return
         except ValueError:
-            await update.effective_message.reply_text("❌ Configuration Error: `TELEGRAM_ALLOWED_USER_IDS` is invalid.")
+            await update.effective_message.reply_text(
+                f"❌ Configuration Error: `TELEGRAM_ALLOWED_USER_IDS` contains invalid data.\n"
+                f"Your Telegram User ID is: `{user.id}`",
+                parse_mode="Markdown"
+            )
             return
         return await func(update, context, *args, **kwargs)
     return wrapper
@@ -838,6 +849,15 @@ async def parse_and_execute(text: str, update: Update, context: ContextTypes.DEF
             return {"success": True, "message": f"📥 Download queued: {rest}"}
         return {"success": False, "message": "❓ Provide a YouTube URL: `download <url>`."}
 
+    if first_word == "record" and "screen" in rest:
+        seconds = 10
+        match = re.search(r"(\d+)", rest)
+        if match: seconds = int(match.group(1))
+        success, msg = screen_recorder.record(seconds)
+        if success:
+            return {"success": True, "message": f"🎥_RECORDING_:{seconds}"}
+        return {"success": False, "message": msg}
+
     # ── 6. VOICE COMMANDS ──────────────────────────────────────────────
     if t == "voice on":
         return {"success": True, "message": voice_system.toggle_voice(True)}
@@ -1000,6 +1020,21 @@ async def cmd_version(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 @require_auth
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    batt = psutil.sensors_battery()
+    batt_str = f"{batt.percent:.0f}% {'🔌' if batt.power_plugged else '🔋'}" if batt else "N/A"
+    await update.message.reply_text(
+        f"📊 *System Status*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🧠 *CPU:* {psutil.cpu_percent(interval=0.5):.1f}%\n"
+        f"📟 *RAM:* {psutil.virtual_memory().percent:.1f}%\n"
+        f"🔋 *Battery:* {batt_str}\n"
+        f"⏱ *Uptime:* {int((time.time() - psutil.boot_time()) / 3600)}h {int(((time.time() - psutil.boot_time()) % 3600) / 60)}m\n"
+        f"━━━━━━━━━━━━━━━━━━━━",
+        parse_mode="Markdown"
+    )
+
+@require_auth
 async def cmd_logs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     log_path = os.path.join(LOG_DIR, "activity_log.txt")
     if "clear" in update.message.text.lower():
@@ -1013,6 +1048,29 @@ async def cmd_logs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lines = f.readlines()
         recent = "".join(lines[-20:])
     await update.message.reply_text(f"📜 *Recent Logs:*\n\n`{recent}`", parse_mode="Markdown")
+
+@require_auth
+async def cmd_record(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/record screen <seconds>"""
+    msg = update.message.text.lower()
+    seconds = 10
+    match = re.search(r"(\d+)", msg)
+    if match: seconds = int(match.group(1))
+    
+    success, res = screen_recorder.record(seconds)
+    if success:
+        processing = await update.message.reply_text(f"🎥 Recording screen for {seconds}s...")
+        await asyncio.sleep(seconds + 2)
+        path = screen_recorder.get_last_recording()
+        if path and os.path.exists(path):
+            await processing.edit_text("✅ Recording complete. Sending video...")
+            with open(path, 'rb') as f:
+                await update.message.reply_video(video=f, caption=f"🎥 Screen Record ({seconds}s)")
+            await processing.delete()
+        else:
+            await processing.edit_text("❌ Recording failed or file not found.")
+    else:
+        await update.message.reply_text(f"❌ {res}")
 
 @require_auth
 async def cmd_storage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1166,6 +1224,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     await processing_msg.edit_text(f"{FRAME_TOP}❌ Research Failed: {topic}{FRAME_BTM}", parse_mode="Markdown")
                 return
 
+            if msg.startswith("🎥_RECORDING_:"):
+                seconds = int(msg.split(":", 1)[1])
+                await processing_msg.edit_text(f"🎥 Recording screen for {seconds}s...")
+                await asyncio.sleep(seconds + 2)
+                path = screen_recorder.get_last_recording()
+                if path and os.path.exists(path):
+                    await processing_msg.edit_text("✅ Recording complete. Sending video...")
+                    with open(path, 'rb') as f:
+                        await update.message.reply_video(video=f, caption=f"🎥 Screen Record ({seconds}s)")
+                    await processing_msg.delete()
+                else:
+                    await processing_msg.edit_text(f"{FRAME_TOP}❌ Recording failed.{FRAME_BTM}", parse_mode="Markdown")
+                return
+
             if msg.startswith("__SEND_FILE__:"):
                 path = msg.split(":", 1)[1]
                 with open(path, 'rb') as f:
@@ -1293,7 +1365,8 @@ def run_bot(token: str = None) -> None:
     app.add_handler(CommandHandler("admin", cmd_owner))
     app.add_handler(CommandHandler("logs", cmd_logs))
     app.add_handler(CommandHandler("storage", cmd_storage))
-    app.add_handler(CommandHandler("status", lambda u, c: u.message.reply_text(f"📊 CPU: {psutil.cpu_percent()}% · RAM: {psutil.virtual_memory().percent}%")))
+    app.add_handler(CommandHandler("record", cmd_record))
+    app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CallbackQueryHandler(cmd_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     

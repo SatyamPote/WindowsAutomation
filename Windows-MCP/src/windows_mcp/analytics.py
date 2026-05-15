@@ -6,7 +6,14 @@ except ImportError:
     import uuid
     def uuid7str():
         return str(uuid.uuid4())
-from fastmcp import Context
+try:
+    from fastmcp import Context
+except Exception:
+    # fastmcp is not available in Telegram-bot-only mode (PyInstaller bundle
+    # doesn't include fastmcp package metadata). The Telegram bot never uses
+    # MCP tools directly, so this is safe to stub out.
+    class Context:  # type: ignore
+        pass
 from functools import wraps
 from pathlib import Path
 import inspect

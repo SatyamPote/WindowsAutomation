@@ -24,10 +24,12 @@ import threading
 import time
 from typing import Any
 
+from windows_mcp.paths import get_lotus_bin_dir, get_lotus_data_dir
+
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_DIR = os.path.join(BASE_DIR, "data")
+# Single source of truth for paths
+DATA_DIR = str(get_lotus_data_dir())
 PLAYLIST_FILE = os.path.join(DATA_DIR, "playlists.json")
 
 IS_WINDOWS = os.name == "nt"
@@ -135,7 +137,18 @@ class MusicPlayer:
         return result["ok"]
 
     def _play_internal(self, song_query: str) -> tuple[bool, str]:
+        # Search priority: 1. System PATH, 2. Project bin folder (via get_lotus_bin_dir)
         mpv_path = shutil.which("mpv")
+        if not mpv_path:
+            bin_dir = get_lotus_bin_dir()
+            # Try root of bin, then subfolder if any
+            local = bin_dir / "mpv.exe"
+            if not local.exists():
+                local = bin_dir / "mpv" / "mpv.exe"
+            
+            if local.exists():
+                mpv_path = str(local)
+        
         if not mpv_path:
             return False, "❌ mpv is not installed or not in PATH."
 

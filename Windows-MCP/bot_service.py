@@ -43,8 +43,17 @@ CONFIG_FILE = get_config_path()
 PID_FILE = os.path.join(DATA_DIR, "lotus_bot.pid")
 LOG_FILE = os.path.join(DATA_DIR, "logs", "bot_service.log")
 
-BOT_SCRIPT = os.path.join(BASE_DIR, "src", "windows_mcp", "telegram_bot.py")
-BOT_SRC_DIR = os.path.join(BASE_DIR, "src")
+from windows_mcp.assets import get_resource_path
+BOT_SCRIPT = get_resource_path("src/windows_mcp/telegram_bot.py")
+BOT_SRC_DIR = get_resource_path("src")
+if os.path.exists(BOT_SRC_DIR) and BOT_SRC_DIR not in sys.path:
+    sys.path.insert(0, BOT_SRC_DIR)
+
+try:
+    from windows_mcp.diagnostics import init_diagnostics
+    init_diagnostics()
+except ImportError:
+    pass
 
 # ── Logging ──
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)

@@ -39,14 +39,27 @@ BASE_DIR = (
     if getattr(sys, "frozen", False)
     else os.path.dirname(os.path.abspath(__file__))
 )
+
+# Add src to path
+src_path = os.path.join(BASE_DIR, "src")
+if os.path.exists(src_path) and src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+try:
+    from windows_mcp.diagnostics import init_diagnostics
+    init_diagnostics()
+except ImportError:
+    pass
 PROGRAM_DATA = os.environ.get("PROGRAMDATA", "C:\\ProgramData")
 DATA_DIR = os.path.join(PROGRAM_DATA, "Lotus")
 PID_FILE = os.path.join(DATA_DIR, "lotus_bot.pid")
 
-ICON_PATH = os.path.join(BASE_DIR, "assets", "lotus_icon.ico")
-LOGO_PATH = os.path.join(BASE_DIR, "assets", "lotus_logo.png")
-BOT_SERVICE = os.path.join(BASE_DIR, "bot_service.py")
-LOTUS_EXE = os.path.join(BASE_DIR, "Lotus.exe")
+from windows_mcp.assets import get_resource_path
+
+ICON_PATH = get_resource_path("assets/lotus_icon.ico")
+LOGO_PATH = get_resource_path("assets/lotus_logo.png")
+BOT_SERVICE = get_resource_path("bot_service.py")
+LOTUS_EXE = os.path.join(os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else BASE_DIR, "Lotus.exe")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────

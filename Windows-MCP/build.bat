@@ -29,36 +29,10 @@ echo      Done.
 echo [2/4] Cleaning old build files...
 if exist dist\Lotus.exe del /f /q dist\Lotus.exe
 if exist build rd /s /q build
-if exist Lotus.spec del /f /q Lotus.spec
 echo      Done.
 
-echo [3/4] Building Lotus.exe...
-python -m PyInstaller ^
-  --onefile ^
-  --noconsole ^
-  --icon=assets\lotus_icon.ico ^
-  --name=Lotus ^
-  --add-data "assets;assets" ^
-  --add-data "src;src" ^
-  --paths "src" ^
-  --hidden-import=windows_mcp.telegram_bot ^
-  --hidden-import=dotenv ^
-  --hidden-import=pystray ^
-  --hidden-import=PIL._tkinter_finder ^
-  --hidden-import=customtkinter ^
-  --hidden-import=psutil ^
-  --hidden-import=telegram ^
-  --hidden-import=telegram.ext ^
-  --hidden-import=yt_dlp ^
-  --hidden-import=rich ^
-  --hidden-import=requests ^
-  --hidden-import=thefuzz ^
-  --hidden-import=thefuzz.fuzz ^
-  --hidden-import=pyperclip ^
-  --hidden-import=pystray._win32 ^
-  --hidden-import=PIL.Image ^
-  --collect-data=customtkinter ^
-  app.py
+echo [3/4] Building Lotus Suite...
+python -m PyInstaller Lotus.spec --noconfirm --clean
 
 if not exist dist\Lotus.exe (
   echo.
@@ -67,24 +41,6 @@ if not exist dist\Lotus.exe (
   exit /b 1
 )
 
-echo [4/5] Building LotusTray.exe ...
-python -m PyInstaller ^
-  --onefile ^
-  --noconsole ^
-  --icon=assets\lotus_icon.ico ^
-  --name=LotusTray ^
-  --add-data "assets;assets" ^
-  --add-data "src;src" ^
-  --add-data "version.json;." ^
-  --add-data "bot_service.py;." ^
-  --paths "src" ^
-  --hidden-import=pystray._win32 ^
-  --hidden-import=PIL.Image ^
-  --hidden-import=psutil ^
-  --hidden-import=requests ^
-  --hidden-import=windows_mcp.updater ^
-  lotus_tray.py
-
 if not exist dist\LotusTray.exe (
   echo.
   echo [ERROR] LotusTray.exe build failed!
@@ -92,7 +48,7 @@ if not exist dist\LotusTray.exe (
   exit /b 1
 )
 
-echo [5/5] Build complete!
+echo [4/4] Build complete!
 echo.
 echo Outputs:
 echo   dist\Lotus.exe
